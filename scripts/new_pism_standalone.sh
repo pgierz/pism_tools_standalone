@@ -8,5 +8,5 @@ SCRIPTDIR=scripts
 
 for d in $INDIR $OUTDIR $RESDIR $SCRIPTDIR
 do
-    mkdir $expid/$d
+    mkdir -pv $expid/$d
 done
