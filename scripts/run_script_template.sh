@@ -7,7 +7,7 @@
 #SBATCH --ntasks=144
 #SBATCH --time=1:00:00
 ################################################################################
-
+echo "This PISM run was perfomed on $HOSTNAME on $(date)"
 ################################################################################
 #           Parallel Ice Sheet Model    R U N   S C R I P T      (Ollie version)
 ################################################################################
@@ -32,6 +32,7 @@
 # Paul J. Gierz, Fri Jul 22 14:36:42 2016                                      #
 # Paul J. Gierz, Mon Jul 26 10:12:41 2016                                      #
 # Paul J. Gierz, Tue Jul 26 16:30:32 2016                                      #
+# Paul J. Gierz, Wed Jul 27 10:59:38 2016                                      #
 # -----------------------------------------------------------------------------#
 # AWI Bremerhaven                                                              #
 ################################################################################
@@ -44,10 +45,45 @@
 # * TODO organize script in such a way that it makes sense
 # * TODO separate parsing of options from setting of options. The user
 #        doesn't need to see everything
+# * TODO functions! functions everywhere!
 #
 ################################################################################
 
 icemod=pismr
+
+########################################
+# DIRECTORY STRUCTURES
+########################################
+
+expid=@EXPID@
+# Directories
+
+homedir=/work/ollie/pgierz/pism_standalone/
+
+outdir=${homedir}/${expid}/output
+indir=${homedir}/${expid}/input
+bindir=/work/ollie/pgierz/pism0.7/bin/
+workdir=${homedir}/${expid}/work
+
+pooldir=/work/ollie/pgierz/pool_pism/
+subpool=examples_greenland
+
+numproc=4			# Number of processors to use
+execution_command="srun --mpi=pmi2"
+
+# Input File Name:
+input_file_name=pism_Greenland_5km_v1.1.nc
+
+# Bootstrapping?
+bootstrap=1
+if [[ $bootstrap -eq 1 ]]
+then
+    bootstrap_opt="-bootstrap"
+fi
+
+# Time Control
+start_year=-10000
+end_year=0
 
 #############################################
 #                     RESOLUTION OPTIONS    
@@ -89,20 +125,29 @@ fi
 Lz=4000
 Lbz=2000
 
-resolution_opt="-Mx $xres_ice -My $yres_ice -Mz $zres_ice -Mbz $bz -z_spacing $z_spacing_opt -Lz $Lz -Lbz $Lbz -skip -skip_max $skip_max"
-
-
+resolution_opt="-Mx $xres_ice -My $yres_ice -Mz $zres_ice -Mbz $bz -z_spacing $z_spacing_opt -Lz $Lz -Lbz $Lbz -skip -skip_max $skip_max "
 
 #########################################################
 # RESTART (Regrid?? why the fuck is this called regrid?)
 #########################################################
-regrid=0			# True 1; False 0
+regrid=1			# True 1; False 0
 if [[ $regrid -eq 1 ]]
 then
     regrid_file=PLACEHOLDER	# PG: file to regrid from goes here
     regrid_vars=litho_temp,thk,enthalpy,tillwat,bmelt # PG: Copied from example
+    regrid_opt="-regrid_file $regrid_file -regrid_vars $regrid_vars"
+else
+    regrid_opt=""
 fi
-regrid_opt="-regrid_file $regrid_file -regrid_vars $regrid_vars"
+
+###############################################################
+#                     COUPLING OPTIONS                        
+###############################################################
+
+# This section is designed to replicate the spinup.sh "coupler = 'blah
+# blah'" output.
+# Paul J. Gierz, Wed Jul 27 10:59:32 2016
+
 
 ######################
 # Bedrock Deformation
@@ -110,7 +155,7 @@ regrid_opt="-regrid_file $regrid_file -regrid_vars $regrid_vars"
 
 # Which bedrock deformation model to use.
 # Allowed values: none, iso, lc
-bed_def=none
+bed_def="lc"
 case $bed_def in
     "none")
 	bed_def_opt=""
@@ -126,43 +171,44 @@ case $bed_def in
 	exit 42
 esac
 
-
-###############################################################
-#                     COUPLING OPTIONS                        
-###############################################################
-
 ###############################
 # Atmosphere >--|> Ice Forcings
 ###############################
-atmophere=none
+atmosphere="searise_greenland"
+use_input=1			# True 1; False 0
+# Uses the input file for the forcing processes in atmosphere
+
 case $atmosphere in
     "none")
 	echo "No atmosphere coupling is used!"
-	atmo_opts=""
+	atmo_flag=""
+	atmo_flag_extra=""
 	;;
     "given")
-	echo "Atmosphere -> Ice coupling type being used: |>>> given <<<|"
+	echo "Atmosphere --> Ice coupling type being used: |>>> given <<<|"
 	atmo_flag=" -atmosphere given"
 	extra_file=${indir}/atmo_given_file.nc
 	atmo_flag_extra=" -atmosphere_given_file $extra_file"
 	;;
     "yearly_cycle")
-	echo "Atmosphere -> Ice coupling type being used: |>>> yearly_cycle <<<|"
+	echo "Atmosphere --> Ice coupling type being used: |>>> yearly_cycle <<<|"
 	echo "Atmosphere coupler for this type not implemented, please go whack Paul over the head to fix this..."
 	;;
     "searise_greenland")
-	echo "Atmosphere -> Ice coupling type being used: |>>> searise_greenland <<<|"
+	echo "Atmosphere --> Ice coupling type being used: |>>> searise_greenland <<<|"
 	atmo_flag=" -atmosphere searise_greenland"
-	extra_file=${indir}/atmo_searise_greenland_file.nc
-	atmo_flag_extra=" -atmosphere=searise_greenland_file $extra_file"
-	echo "Atmosphere coupler for this type not implemented, please go whack Paul over the head to fix this..."
+	if [[  ${use_input} != 1 ]]
+	then
+	    extra_file=${indir}/atmo_searise_greenland_file.nc
+	    atmo_flag_extra=" -atmosphere_searise_greenland_file $extra_file"
+	fi
 	;;
     "one_station")
-	echo "Atmosphere -> Ice coupling type being used: |>>> one_station <<<|"
+	echo "Atmosphere --> Ice coupling type being used: |>>> one_station <<<|"
 	echo "Atmosphere coupler for this type not implemented, please go whack Paul over the head to fix this..."
 	;;
     *)
-	echo "Atmosphere coupler for $atmosphere unknown and not in standard types described in PISM manual. Go talk to Paul, he will figure it out..."
+	echo "ERROR: Atmosphere --> Ice coupler for $atmosphere unknown and not in standard types described in PISM manual. Go talk to Paul, he will figure it out..."
 esac
 
 # atmosphere_modifiers
@@ -173,16 +219,16 @@ then
     # The file needs to be in Kelvin!
     atmosphere_delta_T_file=${indir}/atmo_delta_T_file.nc
     scalar_temperature_offsets_opts=" -atmosphere_delta_T_file $atmosphere_delta_T_file"
-    atmo_modifer_opts="$atmo_modifer_opts $scalar_temperature_offsets_opts"
+    atmo_modifier_opts="$atmo_modifier_opts $scalar_temperature_offsets_opts"
 fi
 
-scalar_precipitation_offsets=1	# True 1; False 0
-if [[ $scalar_temperature_offsets == 1 ]]
+scalar_precipitation_offsets=0	# True 1; False 0
+if [[ $scalar_precipitation_offsets == 1 ]]
 then
     atmo_flag="${atmo_flag},delta_P"
     atmosphere_delta_P_file=${indir}/atmo_delta_P_file.nc
     scalar_temperature_offsets_opts=" -atmosphere_delta_P_file $atmosphere_delta_P_file"
-    atmo_modifer_opts="$atmo_modifer_opts $scalar_temperature_offsets_opts"
+    atmo_modifier_opts="$atmo_modifier_opts $scalar_temperature_offsets_opts"
 fi
 
 paleo_precipitation=1 		# True 1; False 0
@@ -190,10 +236,11 @@ if [[ $paleo_precipitation == 1 ]]
 then
     atmo_flag="${atmo_flag},paleo_precip"
     extra_file=${indir}/paleo_precip_file.nc
-    paleo_precip_opts=" -atmosphere_paleo_precip"    
+    paleo_precip_opts=" -atmosphere_paleo_precip_file $extra_file"
+    atmo_modifier_opts="$atmo_modifier_opts $paleo_precip_opts"
 fi
 
-# The following atmospheric modifers are not (yet) implemented in the
+# The following atmospheric modifiers are not (yet) implemented in the
 # run script logic, but can be set with command switches at the end if
 # the command string is modified at the end of the runscript.
 
@@ -201,18 +248,21 @@ fi
 # lapse_rate
 # anomaly
 
+# Full Atmosphere command
+atmo_command="${atmo_flag} ${atmo_flag_extra} ${atmo_modifier_opts}"
+
 #########################
 # Surface Process Models
 #########################
 
-surface_opt="given"
+surface_opt="pdd"
 case $surface_opt in
     "simple")
-	surface_opts=" -surface simple"
+	surface_command=" -surface simple"
 	;;
     "given")
 	surface_given_file=${input_file_name}
-	surface_opts=" -surface given -surface_given_file $surface_given_file"
+	surface_command=" -surface given -surface_given_file $surface_given_file"
 	;;
     "elevation")
 	echo "surface type for $surface_opt not implemented, please go whack Paul over the head to fix this..."
@@ -220,8 +270,9 @@ case $surface_opt in
     "pdd")
 	# Fuck this one is complicated...
 	pdd_sd_file=pdd_sd_file.nc
-	
-	surface_opts=" -surface pdd "
+	# pdd_sd_period (years?)
+	# pdd_sd_reference_year
+	surface_command=" -surface pdd "
 	;;
     "pik")
 
@@ -230,6 +281,95 @@ case $surface_opt in
     *)
 	echo "unknown surface opt provided. Go talk to Paul, he will figure it out..."
 esac
+
+
+###########################
+# Ocean >--|> Ice Forcings
+###########################
+ocean="constant"
+use_input=1			# True 1; False 0
+# Uses the input file for the forcing processes in atmosphere
+
+case $ocean in
+    "constant")
+	echo "Ocean --> Ice coupling being used is |>> constant <<| (This is the default choice)"
+	ocean_flag="-ocean constant"
+	;;
+    "given")
+	echo "Ocean --> Ice coupling being used is |>> given <<|"
+	ocean_flag="-ocean given"
+	if [[ ${use_input} != 1 ]]
+	then
+	    extra_file=${indir}/ocean_given_file.nc
+	    ocean_flag_extra=" -ocean_given_file $extra_file"
+	fi	
+	;;
+    "pik")
+	echo "Ocean --> Ice coupling being used is |>> pik <<|"
+	ocean_flag="-ocean pik"
+	ocean_flag_extra="-meltfactor_pik ??"
+	# This isn't implemented correctly yet
+	;;
+    "th")	
+	echo "Ocean --> Ice coupling being used is |>> th <<|"
+	ocean_flag=" -ocean th"
+	extra_file=${indir}/ocean_th_file.nc
+	ocean_flag_extra=" -ocean_th_file $extra_file"
+	;;
+    *)
+	echo "ERROR: Ocean --> Ice coupler for $ocean unknown and not in the standard types described in PISM manual."
+esac
+
+# Ocean modifiers
+scalar_sea_level_offset=1
+if [[ $scalar_sea_level_offset == 1 ]]
+then
+    ocean_flag="${ocean_flag},delta_SL"
+    # The data should be in meters!
+    delta_SL_file="${indir}"/ocean_delta_SL_file.nc
+    delta_SL_opts=" -ocean_delta_SL_file $delta_SL_file"
+    ocean_modifier_opts="${ocean_modifier_opts} $delta_SL_opts"
+fi
+
+scalar_subshelf_temperature_offset=0
+if [[ $scalar_subshelf_temperature_offset == 1 ]]
+then
+    ocean_flag="${ocean_flag},delta_T"
+    # The data should be in meters!
+    delta_T_file="${indir}"/ocean_delta_T_file.nc
+    delta_T_opts=" -ocean_delta_T_file $delta_T_file"
+    ocean_modifier_opts="${ocean_modifier_opts} $delta_T_opts"
+fi
+
+scalar_subshelf_mass_flux_offset=0
+if [[ $scalar_subshelf_mass_flux_offset == 1 ]]
+then
+    ocean_flag="${ocean_flag},delta_SMB"
+    # The data should be in meters!
+    delta_SMB_file="${indir}"/ocean_delta_SMB_file.nc
+    delta_SMB_opts=" -ocean_delta_SMB_file $delta_SMB_file"
+    ocean_modifier_opts="${ocean_modifier_opts} $delta_SMB_opts"
+fi
+
+scalar_melange_back_pressure_fraction_offset=0
+if [[ $scalar_melange_back_pressure_fraction_offset == 1 ]]
+then
+    ocean_flag="${ocean_flag},delta_MBP"
+    # The data should be in meters!
+    delta_MBP_file="${indir}"/ocean_delta_MBP_file.nc
+    delta_MBP_opts=" -ocean_delta_MBP_file $delta_MBP_file"
+    ocean_modifier_opts="${ocean_modifier_opts} $delta_MBP_opts"
+fi
+
+# Not yet implemented in the runscript:
+# caching
+   
+ocean_command="${ocean_flag} ${ocean_flag_extra} ${ocean_modifier_opts}"
+
+##############################
+# Construct full coupler flag
+##############################
+coupler_opt="${bed_def_opt} ${atmo_command} ${surface_command} ${ocean_command}"
 
 
 #####################################
@@ -272,17 +412,6 @@ tauc_slippery_grounding_lines=1		# 1 True, 0 False
 # END OF USER INTERFACE
 ################################################################################
 
-# Header for log:
-
-echo "This PISM run was perfomed on $HOSTNAME on $(date)"
-echo "expid: $expid"
-
-
-# Directories
-outdir=${homedir}/${expid}/output
-workdir=${homedir}/${expid}/work
-indir=${homedir}/${expid}/input
-
 
 ts_file_name=${expid}_${icemod}_timeseries_${start_year}-${end_year}.nc
 ex_file_name=${expid}_${icemod}_extra_${start_year}-${end_year}.nc
@@ -292,21 +421,32 @@ ex_vars=diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,velsurfmag,mask,th
 output_file_name=${expid}_${icemod}_main_${start_year}-${end_year}.nc
 
 # Prepare Work Directory
-## Empty work
-for f in ${workdir}/*
-do
-echo "Removing $f from ${workdir}..."
-rm -v $f
-done
+function prep_workdir {
+    for f in ${workdir}/*
+    do
+	echo "Removing $f from ${workdir}..."
+	rm -v $f
+    done
+    echo "Getting binary..."
+    cp ${bindir}/${icemod} ${workdir}
+    echo "Getting needed input files:"
+    # TODO: Make "NEEDED FILES" variable
+    cp ${indir}/${input_file_name} ${workdir}
+}
 
-## Copy files
-if [ ! -f ${indir}/${input_file_name} ]
-then
-    cp ${pooldir}/input/${subpool}/${input_file_name} ${indir}
-fi
+# Prepare Input Directory
+function prep_indir {
+    # TODO: Make "NEEDED FILES" variable
+    ## Copy files
+    if [ ! -f ${indir}/${input_file_name} ]
+    then
+	cp ${pooldir}/input/${subpool}/${input_file_name} ${indir}
+    fi    
+}
 
-cp ${indir}/${input_file_name} ${workdir}
-cp ${bindir}/${icemod} ${workdir}
+
+
+
 
 # Parse Options:
 ## Ice Dynamics Opts
@@ -317,7 +457,6 @@ ICE_DYN_OPTS="$ICE_DYN_OPTS $CALVING_OPTS"
 # PG: Find out how to generalize this
 # This is a standard value for topg_to_phi?
 TTPHI="15.0,40.0,-300.0,700.0"
-
 if [[ $pseudo_plastic -eq 1 ]]
 then
     PSEUDOPLASTIC_OPT="-pseudo_plastic -pseudo_plastic_q $pseudo_plastic_q"
@@ -341,60 +480,54 @@ fi
 #             UNSORTED OPTIONS THAT NEED TO BE MOVED    
 #########################################################
 
-########################################
-# DIRECTORY STRUCTURES
-########################################
-
-expid=@EXPID@
-homedir=/work/ollie/pgierz/pism_standalone/
-bindir=/work/ollie/pgierz/pism0.7/bin/
-pooldir=/work/ollie/pgierz/pool_pism/
-subpool=examples_greenland
-
-numproc=4			# Number of processors to use
-execution_command="srun --mpi=pmi2"
-
-# Input File Name:
-input_file_name=pism_Greenland_5km_v1.1.nc
-
-# Bootstrapping?
-bootstrap=1
-if [[ $bootstrap -eq 1 ]]
-then
-    bootstrap_opt="-bootstrap"
-fi
-
-# Time Control
-start_year=-10000
-end_year=0
-
-#########
-# FORCING
-#########
-
-surface="given -surface_given_file $input_file_name"
-
 
 
 ###################################
 #     Launch the Model            
 ###################################
+check=1
 
-cd ${workdir}
-$execution_command -n $numproc $icemod -i $input_file_name \
-		   $bootstrap_opt \
-		   $resolution_opt \
-		   -ys $start_year -ye $end_year \
-		   -surface $surface \
-		   -${ICE_DYN_OPTS} \
-		   -ts_file $ts_file_name -ts_times ${start_year}:yearly:${end_year} \
-		   -extra_file $ex_file_name -extra_times ${start_year}:${ex_interval}:${end_year} -extra_vars $ex_vars \
-		   -o $output_file_name
-# Clean Up
-mv $ts_file_name $ex_file_name $output_file_name $outdir
+# Header for log:
 
-# Go back
-cd -
+
+
+echo "All options set for run with: "
+echo "expid: $expid"
+
+if [[ $check -eq 1 ]]
+then
+    echo prep_indir
+    echo prep_workdir
+    echo   $execution_command -n $numproc $icemod -i $input_file_name \
+	   $bootstrap_opt \
+	   $resolution_opt \
+	   -ys $start_year -ye $end_year \
+	   ${regrid_opt} \
+	   ${coupler_opt} \
+	   ${ICE_DYN_OPTS} \
+	   -ts_file $ts_file_name -ts_times ${start_year}:yearly:${end_year} \
+	   -extra_file $ex_file_name -extra_times ${start_year}:${ex_interval}:${end_year} -extra_vars $ex_vars \
+	   -o $output_file_name
+else
+    cd ${workdir}
+    prep_indir
+    prep_workdir
+    $execution_command -n $numproc $icemod -i $input_file_name \
+		       $bootstrap_opt \
+		       $resolution_opt \
+		       -ys $start_year -ye $end_year \
+		       ${regrid_opt} \
+		       ${coupler_opt} \
+		       ${ICE_DYN_OPTS} \
+		       -ts_file $ts_file_name -ts_times ${start_year}:yearly:${end_year} \
+		       -extra_file $ex_file_name -extra_times ${start_year}:${ex_interval}:${end_year} -extra_vars $ex_vars \
+		       -o $output_file_name
+
+    # Clean Up
+    mv $ts_file_name $ex_file_name $output_file_name $outdir
+    # Go back
+    cd -
+fi
 
 ##################
 #         END    
