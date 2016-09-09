@@ -7,3 +7,11 @@
 #
 # Paul J. Gierz, Fri Sep  9 13:22:00 2016
 
+
+
+function usage() {
+    echo "The script pism_input_from_gcm.sh is designed to take input from a GCM "
+    echo " NCL is needed!"
+}
+
+
