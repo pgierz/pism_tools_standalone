@@ -1,0 +1,20 @@
+#!/bin/bash
+
+gfile=grid_10km.nc
+
+
+#1.create a grid file containing the information of cartisian coordinates in the certain region   
+# Python script to generate map for target area (afterwards, an additional variable should be added to this file)
+# output: ll_${gfile}
+#
+echo "=========1.mask grid =================> "
+echo "generate grid file: (convert_polar_stereographic.py)"
+./1convert_polar_stereographic.py  ${gfile}
+echo "OUTPUT file: ll_$gfile (NH resolution: 10km)" 
+
+#make grid file readable for CDO  
+# output: ${gfile}   input: ll_${gfile} 
+echo "convert to CDO readable version"
+./2generate_CDO_readable_grid_version.job ll_$gfile  $gfile
+#rm ll_$gfile
+echo "OUTPUT file: CDO readable grid file $gfile (NH resolution: 10km)"
