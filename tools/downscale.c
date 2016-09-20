@@ -16,10 +16,10 @@
 
 
 int main() {
-  printf("Hello!");
+  /* printf("PG: Hello! \n"); */
   /* There will be netCDF IDs for the file, each group, and each
    * variable. */
-  int ncid, varid1, varid2, grp1id, grp2id;
+  int ncid, varid1, grp1id;
   unsigned long long data_in[NX][NY];
   /* Loop indexes, and error handling. */
   int x, y, retval;
@@ -32,38 +32,33 @@ int main() {
   struct s1 compound_data[NX][NY];
   /* Open the file. NC_NOWRITE tells netCDF we want read-only access
    * to the file.*/
+
+  /* printf("PG: Opening file... \n"); */
   if ((retval = nc_open(FILE_NAME, NC_NOWRITE, &ncid)))
     ERR(retval);
+  /* printf("PG: Done!\n"); */
 
-   
   /* Get the group ids of our two groups. */
-  if ((retval = nc_inq_ncid(ncid, "grp1", &grp1id)))
+  /* printf("PG: Getting gids... \n"); */
+  if ((retval = nc_inq_ncid(ncid, "temp2", &grp1id)))
     ERR(retval);
-  if ((retval = nc_inq_ncid(ncid, "grp2", &grp2id)))
-    ERR(retval);
+  /* printf("PG: Done!\n"); */
+
   /* Get the varid of the uint64 data variable, based on its name, in
    * grp1. */
-  if ((retval = nc_inq_varid(grp1id, "data", &varid1))) 
+  if ((retval = nc_inq_varid(grp1id, "temp2", &varid1))) 
     ERR(retval);
   /* Read the data. */
   if ((retval = nc_get_var_ulonglong(grp1id, varid1, &data_in[0][0])))
     ERR(retval);
-  /* Get the varid of the compound data variable, based on its name,
-   * in grp2. */
-  if ((retval = nc_inq_varid(grp2id, "data", &varid2))) 
-    ERR(retval);
-  /* Read the data. */
-  if ((retval = nc_get_var(grp2id, varid2, &compound_data[0][0])))
-    ERR(retval);
-  /* Check the data. */
-  for (x = 0; x < NX; x++)
-    for (y = 0; y < NY; y++)
-      {
-	if (data_in[x][y] != x * NY + y ||
-	    compound_data[x][y].i1 != 42 ||
-	    compound_data[x][y].i2 != -42)
-	  return ERRCODE;
-      }
+  
+  /* Check the data */
+  for (x = 0; x < NX; x++) {
+    for (y = 0; y < NY; y++) {
+      printf("%d ",data_in[x][y]);
+    }
+  }
+
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
     ERR(retval);
