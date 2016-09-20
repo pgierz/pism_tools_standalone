@@ -7,8 +7,55 @@ import argparse
 from scipy.io import netcdf
 import matplotlib.pyplot as plt
 import logging
+import sys
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[33m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+    
+# Custom formatter
+class MyFormatter(logging.Formatter):
+
+    err_fmt = bcolors.FAIL+"ERROR: %(msg)s"+bcolors.ENDC
+    dbg_fmt = bcolors.WARNING+"DBG: %(module)s: %(lineno)d: %(msg)s"+bcolors.ENDC
+    info_fmt = bcolors.HEADER+"%(msg)s"+bcolors.ENDC
+
+    def __init__(self, fmt="%(levelno)s: %(msg)s"):
+        logging.Formatter.__init__(self, fmt)
+
+    def format(self, record):
+
+        # Save the original format configured by the user
+        # when the logger formatter was instantiated
+        format_orig = self._fmt
+
+        # Replace the original format with one customized by logging level
+        if record.levelno == logging.DEBUG:
+            self._fmt = MyFormatter.dbg_fmt
+
+        elif record.levelno == logging.INFO:
+            self._fmt = MyFormatter.info_fmt
+
+        elif record.levelno == logging.ERROR:
+            self._fmt = MyFormatter.err_fmt
+
+        # Call the original formatter class to do the grunt work
+        result = logging.Formatter.format(self, record)
+
+        # Restore the original format configured by the user
+        self._fmt = format_orig
+
+        return result
+
+    
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Downscaling Script')
     parser.add_argument('ifile_lo', metavar="F lo", type=str,
@@ -103,7 +150,7 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
             logging.debug("right_l is " + str(right_l))
             logging.debug("right_k is " + str(right_k))
 
-            logging.info("Starting downscale_field for index coordinates (%s, %s)" % (str(i), str(j)))
+            logging.info(bcolors.FAIL+bcolors.UNDERLINE+"Starting downscale_field for index coordinates (%s, %s)" % (str(i), str(j)))
 
             # If both ranges exist:
             if range(int(left_k), int(right_k)) and range(int(left_l), int(right_l)):
@@ -127,14 +174,18 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
                 logging.debug("elev_hi is: "+str(elev_hi[i, j]))
                 logging.debug("elev_lo is: "+str(elev_lo[i, j]))
 
-
     logging.info("Finished! Total time is %s" % str((time.time() - now)))
     return field_hi
 
 
 def main():
     args = parse_arguments()
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=args.loglevel)
+    fmt = MyFormatter()
+    hdlr = logging.StreamHandler(sys.stdout)
+    hdlr.setFormatter(fmt)
+    logging.root.addHandler(hdlr)
+    logging.root.setLevel(args.loglevel)
+    # logging.basicConfig(format='%(name) - %(levelname)s: - %(message)s', level=args.loglevel)
     T_lo_varname = "TT"
     H_lo_varname = "SH"
     H_hi_varname = "SH"
