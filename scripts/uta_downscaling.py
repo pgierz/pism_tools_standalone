@@ -105,12 +105,14 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
 
     logging.info("Downscaling Temperature")
     logging.info("Start...")
-    logging.debug("PG: j range will be "+str(1 + half_a_box_y)+" "+str(size_y - half_a_box_y))
-    logging.debug("PG: i range will be "+str(1 + half_a_box_x)+" "+str(size_x - half_a_box_x))
-    for j in range(int(1 + half_a_box_y), int(size_y - half_a_box_y)):
-        for i in range(int(1 + half_a_box_x), int(size_x - half_a_box_x)):
-            # if mask[i, j] > 0:
-            if True:
+    logging.debug("PG: j range will be "+str(half_a_box_y)+" "+str(size_y - half_a_box_y))
+    logging.debug("PG: i range will be "+str(half_a_box_x)+" "+str(size_x - half_a_box_x))
+    for j in range(int(half_a_box_y), int(size_y - half_a_box_y)):
+        for i in range(int(half_a_box_x), int(size_x - half_a_box_x)):
+    # for j in range(size_y):
+    #     for i in range(size_x):
+            if mask[i, j] > 0:
+            # if True:
                 min_height_lo = np.nanmin(
                     elev_lo[i - half_a_box_x:i + half_a_box_x, j - half_a_box_y:j + half_a_box_y])
                 max_height_lo = np.nanmax(
@@ -126,7 +128,7 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
                 max_value = np.nanmax(
                     field_lo[i - half_a_box_x:i + half_a_box_x, j - half_a_box_y:j + half_a_box_y])
 
-                if j == (1 + half_a_box_y):
+                if j == (half_a_box_y):
                     left_k = -half_a_box_y
                     right_k = 0.
                 elif j == (size_y - half_a_box_y):
@@ -135,7 +137,7 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
                 else:
                     left_k = 0.
                     right_k = 0.
-                if i == (1 + half_a_box_x):
+                if i == (half_a_box_x):
                     left_l = -half_a_box_x
                     right_l = 0
                 elif i == (size_x - half_a_box_x):
@@ -144,6 +146,11 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
                 else:
                     left_l = 0.
                     right_l = 0.
+            else:
+                left_l = 0.
+                right_l = 0.
+                left_k = 0.
+                right_k = 0.
 
             logging.debug("left_l is " + str(left_l))
             logging.debug("left_k is " + str(left_k))
@@ -156,23 +163,24 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
             if range(int(left_k), int(right_k)) and range(int(left_l), int(right_l)):
                 for k in range(int(left_k), int(right_k)):
                     for l in range(int(left_l), int(right_l)):
-                        logging.debug(str(i+l))
-                        logging.debug(str(j+k))
+                        # logging.debug(str(i+l))
+                        # logging.debug(str(j+k))
                         if mask[i + l, j + k] > 0:
                             # if ((max_height_lo == min_height_lo) or (len(max_height_lo) < 1)):
                             if (max_height_lo == min_height_lo):
                                 field_hi[i + l, j + k] = field_lo[i + l, j + k]
                             else:
-                                lapse = (min_value - max_value) / (max_height_lo - min_height_hi)
+                                lapse = (min_value - max_value) / (max_height_lo - min_height_lo)
                                 field_hi[i + l, j + k] = field_lo[i + l, j + k] + lapse * (elev_hi[i + l, j + k] - elev_lo[i + l, j + k])
             # Else both ranges are 0
-            else:
-                lapse = (min_value - max_value) / (max_height_lo - min_height_hi)
-                field_hi[i, j] = field_lo[i, j] + lapse * (elev_hi[i, j] - elev_lo[i, j])
-                logging.debug("field_lo is: "+str(field_lo[i, j]))
-                logging.debug("lapse is: "+str(lapse))
-                logging.debug("elev_hi is: "+str(elev_hi[i, j]))
-                logging.debug("elev_lo is: "+str(elev_lo[i, j]))
+            # else:
+            #     if mask[i, j] > 0:
+            #         lapse = (min_value - max_value) / (max_height_lo - min_height_lo)
+            #         field_hi[i, j] = field_lo[i, j] + lapse * (elev_hi[i, j] - elev_lo[i, j])
+            #         logging.debug("field_lo is: "+str(field_lo[i, j]))
+            #         logging.debug("lapse is: "+str(lapse))
+            #         logging.debug("elev_hi is: "+str(elev_hi[i, j]))
+            #         logging.debug("elev_lo is: "+str(elev_lo[i, j]))
 
     logging.info("Finished! Total time is %s" % str((time.time() - now)))
     return field_hi
@@ -208,6 +216,12 @@ def main():
     ax3 = plt.subplot(133)
     m = ax3.contourf(mask)
     plt.colorbar(m)
+
+    # plt.figure()
+    # ax1 = plt.subplot(121)
+    # ax1.contourf(H_hi)
+    # ax2 = plt.subplot(122)
+    # ax2.contourf(H_lo)
     plt.show()
 
 if __name__ == '__main__':
