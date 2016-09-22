@@ -1,4 +1,4 @@
-#include <stdlib.h>
+3#include <stdlib.h>
 #include <stdio.h>
 #include <netcdf.h>
 
@@ -14,7 +14,11 @@
 #define ERRCODE 2
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
-
+/* PG: Make an array...? */
+double downscale_field[NX][NY];
+printf("*** NEW array made! \n");
+printf("%s", downscale_field);
+  
 int main() {
   /* printf("PG: Hello! \n"); */
   /* There will be netCDF IDs for the file, each group, and each
@@ -62,6 +66,9 @@ int main() {
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
     ERR(retval);
+
+
+  
   printf("*** SUCCESS reading example file %s!\n", FILE_NAME);
   return 0;
 }
