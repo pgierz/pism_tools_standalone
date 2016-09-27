@@ -1,4 +1,4 @@
-function [T_down,PDD_in,PDD_out,gradient]=uta_downscaling(T,elev,elev2,elevi,mask,gradient,half_a_box,stddev,PP_o,lapse_v)
+function [T_down,PDD_in,PDD_out,gradient]=uta_downscaling(T,elev_hi,elev_lo,elevi,mask,gradient,half_a_box,stddev,PP_o,lapse_v)
 %allow for variable stddev
 
     T_down=T*NaN;
@@ -17,24 +17,24 @@ function [T_down,PDD_in,PDD_out,gradient]=uta_downscaling(T,elev,elev2,elevi,mas
     for j = (1+half_a_boxy:(LY-half_a_boxy))
         for (i = 1+half_a_boxx : (LX-half_a_boxx))
             if (mask(i,j))
-                if (length(find(~isnan(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy))))>0)
-                    min_height2 = nanumin(elev2(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
-                    min_height = nanumin(elev(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
-                    max_height2 = nanumax(elev2(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
-                    min_value = nanumin(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
-                    max_value = nanumax(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
-
-                    if ( j == (1 + half_a_boxy))
-                        left_k = -half_a_boxy;
-                        right_k = 0;
-                    else if ( j == (LY - half_a_boxy))
-                            left_k = 0;
-                            right_k = half_a_boxy;
-                    else
+                % if (length(find(~isnan(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy))))>0) 
+                min_height2 = nanumin(elev_lo(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
+                min_height = nanumin(elev_hi(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
+                max_height2 = nanumax(elev_lo(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
+                min_value = nanumin(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
+                max_value = nanumax(T(i-half_a_boxx:i+half_a_boxx,j -half_a_boxy:j+half_a_boxy));
+                % PG: Got here 
+                if ( j == (1 + half_a_boxy))
+                    left_k = -half_a_boxy;
+                    right_k = 0;
+                else if ( j == (LY - half_a_boxy))
                         left_k = 0;
-                        right_k = 0;
-                    end
+                        right_k = half_a_boxy;
+                else
+                    left_k = 0;
+                    right_k = 0;
                 end
+                    % end
                 % end %( j == (1 + half_a_boxy))
                 if ( i == (1 + half_a_boxx))
                     left_l = -half_a_boxx;
@@ -62,7 +62,7 @@ function [T_down,PDD_in,PDD_out,gradient]=uta_downscaling(T,elev,elev2,elevi,mas
                             else
                                 lapse(i+l,j+k)= (min_value - max_value) / (max_height2-min_height2);
                                 T_down(i+l,j+k) = T(i+l,j+k) + ...
-                                    lapse(i+l,j+k)* (elev(i+l,j+k) - elev2(i+l,j+k));
+                                    lapse(i+l,j+k)* (elev_hi(i+l,j+k) - elev_lo(i+l,j+k));
 
                             end
                         end
