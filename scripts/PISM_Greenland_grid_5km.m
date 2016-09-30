@@ -1,5 +1,5 @@
-rlon=ncread('/csys/nobackup1_PALEO/ukrebska/MAR_data/ICE.2013.01-08.f07.nc','LON');
-rlat=ncread('/csys/nobackup1_PALEO/ukrebska/MAR_data/ICE.2013.01-08.f07.nc','LAT');
+rlon=ncread('/work/ollie/pgierz/pool_pism/input/examples_greenland/pism_Greenland_5km_v1.1.nc','lon');
+rlat=ncread('/work/ollie/pgierz/pool_pism/input/examples_greenland/pism_Greenland_5km_v1.1.nc','lat');
 %rlon=360+rlon
 rlon=double(rlon);
 rlat=double(rlat);
@@ -30,9 +30,9 @@ xbounds=[rlon_ul(:) rlon_ll(:) rlon_lr(:) rlon_ur(:)];
 ybounds=[rlat_ul(:) rlat_ll(:) rlat_lr(:) rlat_ur(:)];
 %xbounds=xbounds(:)';
 %ybounds=ybounds(:)';
-save -ascii MAR_rlon rlon
-save -ascii MAR_rlat rlat
-save -ascii MAR_xbounds xbounds
-save -ascii MAR_ybounds ybounds
+save -ascii grid_output/PISM_rlon_5km rlon
+save -ascii grid_output/PISM_rlat_5km rlat
+save -ascii grid_output/PISM_xbounds_5km xbounds
+save -ascii grid_output/PISM_ybounds_5km ybounds
 
 %cornerx=[rlon_ul(:) rlon 
