@@ -82,15 +82,20 @@ def parse_arguments():
                         help="The path of the input file to use (lo res)")
     parser.add_argument('ifile_hi', metavar="F hi", type=str,
                         help="The path of the input file to use (hi res)")
+    parser.add_argument('-o', '--output', help="name of outfile netcdf file",
+                        dest="ofilename",
+                        default="ofile.nc")
     parser.add_argument('-d', '--debug', help="lots of output for debugging",
                         action="store_const", dest="loglevel", const=logging.DEBUG,
                         default=logging.WARNING)
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_const", dest="loglevel", const=logging.INFO)
+    parser.add_argument("-p", "--plot", help="Plots the fields to check", 
+                        action="store_true", dest="plot")
     return parser.parse_args()
 
 
-def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=10):
+def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
     now = time.time()
     field_hi = np.empty(field_lo.shape) * np.nan
     half_a_box_y = round(0.8 * half_a_box)
@@ -179,36 +184,42 @@ def main():
     H_lo_varname = "SH"
     H_hi_varname = "SH"
     mask_varname = "MSK"
-    # mon = month - 1 0: J, 1: F, 2:M, 3:A 4:M ...
+
+    # Make the output file:
+    shutil.copy(args.ifile_lo, args.ofilename)
+
     T_lo = netcdf.netcdf_file(args.ifile_lo).variables[T_lo_varname].data[6, -1, :, :].squeeze()
     T_or = netcdf.netcdf_file(args.ifile_hi).variables[T_lo_varname].data[6, -1, :, :].squeeze()
     H_lo = netcdf.netcdf_file(args.ifile_lo).variables[H_lo_varname].data.squeeze()
 
     H_hi = netcdf.netcdf_file(args.ifile_hi).variables[H_hi_varname].data.squeeze()
     mask = netcdf.netcdf_file(args.ifile_hi).variables[mask_varname].data.squeeze()
-    T_hi = downscale_field(T_lo, H_hi, H_lo, mask, half_a_box=5)
+    T_hi = downscale_field(T_lo, H_hi, H_lo, mask, half_a_box=20)
 
-    num_levels = 20
-    vmin, vmax = -45, 25
-    midpoint = 0
-    levels = np.linspace(vmin, vmax, num_levels)
-    midp = np.mean(np.c_[levels[:-1], levels[1:]], axis=1)
-    vals = np.interp(midp, [vmin, midpoint, vmax], [0, 0.5, 1])
-    colors = plt.cm.seismic(vals)
-    cmap, norm = from_levels_and_colors(levels, colors)
-    norm = MidpointNormalize(midpoint=0)
+    # TODO: Write ofile to netcdf
+    
+    if args.plot:
+        num_levels = 20
+        vmin, vmax = -45, 25
+        midpoint = 0
+        levels = np.linspace(vmin, vmax, num_levels)
+        midp = np.mean(np.c_[levels[:-1], levels[1:]], axis=1)
+        vals = np.interp(midp, [vmin, midpoint, vmax], [0, 0.5, 1])
+        colors = plt.cm.seismic(vals)
+        cmap, norm = from_levels_and_colors(levels, colors)
+        norm = MidpointNormalize(midpoint=0)
 
-    plt.figure("Temperatures (lo, hi) and Mask")
-    ax1 = plt.subplot(131)
-    m = ax1.contourf(T_lo, interpolation='none', extend="both", cmap=cmap, norm=norm)
+        plt.figure("Temperatures (lo, hi) and Mask")
+        ax1 = plt.subplot(131)
+        m = ax1.contourf(T_lo, interpolation='none', extend="both", cmap=cmap, norm=norm)
 
-    ax2 = plt.subplot(132)
-    m = ax2.contourf(T_hi, interpolation='none', extend="both", cmap=cmap, norm=norm)
+        ax2 = plt.subplot(132)
+        m = ax2.contourf(T_hi, interpolation='none', extend="both", cmap=cmap, norm=norm)
 
-    ax3 = plt.subplot(133)
-    m = ax3.contourf(T_or, interpolation='none', extend="both", cmap=cmap, norm=norm)
+        ax3 = plt.subplot(133)
+        m = ax3.contourf(T_or, interpolation='none', extend="both", cmap=cmap, norm=norm)
 
-    plt.show()
+        plt.show()
 
 if __name__ == '__main__':
     with warnings.catch_warnings():
