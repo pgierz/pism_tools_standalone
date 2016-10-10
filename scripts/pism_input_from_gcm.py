@@ -177,8 +177,7 @@ def prep_file_atmo(args):
     ############################################################
     # Make X and Y
     ############################################################
-
-    
+    # TODO: This still needs to be done in some clever-ish way
     ############################################################
     air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
                                                ('y', 'x'))
