@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+#################
+# IMPORT MODULES
+#################
+
 import argparse
 import datetime
 import logging
@@ -24,9 +28,12 @@ except ImportError:
         "cdo-python interface could not be found. " +
         "Try installing it via: \n pip install --user cdo")
 
+
+###############
+# LOGGER STUFF
+###############
+
 # Colors for logger
-
-
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -76,6 +83,10 @@ class MyFormatter(logging.Formatter):
         self._fmt = format_orig
 
         return result
+
+#########
+# PARSER
+#########
 
 
 def _parse_file_and_var(s):
@@ -135,6 +146,18 @@ def parse_arguments():
     return parser.parse_args()
 
 
+##########
+# CLASSES
+##########
+
+class pism_output_file(object):
+    # Something something
+    pass
+
+
+############
+# FUNCTIONS
+############
 def remap(args):
         CDO = cdo.Cdo()
         if not os.path.exists(args.ofile):
@@ -154,26 +177,61 @@ def prep_file_atmo(args):
     ############################################################
     air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
                                                ('y', 'x'))
+    air_temp_mean_annual.standard_name = "air_temperature"
+    air_temp_mean_annual.long_name = "Annual Mean Air Temperature (2 meter)"
+    air_temp_mean_annual.grid_mapping = "mapping"
+    air_temp_mean_annual.coordinates = "lon lat"
     air_temp_mean_annual[:] = fin_temp.variables["temp2"].data.mean(axis=0)
+
     ############################################################
     air_temp_mean_july = fout.createVariable("air_temp_mean_july", 'f8',
                                              ('y', 'x'))
-    air_temp_mean_july[:] = fin_temp.variables["temp2"].data[6,:,:]
+    air_temp_mean_july.standard_name = "air_temperature"
+    air_temp_mean_july.long_name = "July Mean Air Temperature (2 meter)"
+    air_temp_mean_july.grid_mapping = "mapping"
+    air_temp_mean_july.coordinates = "lon lat"
+    air_temp_mean_july[:] = fin_temp.variables["temp2"].data[6, :, :]
     ############################################################
     precipitation = fout.createVariable("precipitation", 'f8',
                                         ('y', 'x'))
+    precipitation.units = "m s-1"
+    precipitation.long_name = "Yearly mean total precipitation"
+    precipitation.standard_name = "lwe_precipitation_rate"
+    precipitation._FillValue = "-9.e+33f"
     p = fin_precip.variables["precip"].data.mean(axis=0)
     p = p/910.  # PG: Convert from kg/m^2s => m/s ice equivalent, see NOTE
     precipitation[:] = p
     ############################################################
-    # NOTE
+    # NOTE: Someone needs to confirm this
     # p [kg/m^-2 * s] = [1 l/s] = [1 mm/s] * rho_liquid / rho_solid * 1 [m] / 1000 [mm] = p [m_ice/s]
     ############################################################
-
+    fout.author = "Paul J. Gierz"
     fout.institution = "Alfred Wegener Institute"
     fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
     fout.sync()
 
+
+def downscale(args):
+    if downscale_available:
+        field_hi = downscale_field(
+            netcdf.netcdf_file(args.ofile).variables[args.ifile_gcm[1]].data.squeeze(),
+            netcdf.netcdf_file(args.downscale_hires[0]).variables[args.downscale_hires[1]].data.squeeze(),
+            netcdf.netcdf_file(args.downscale_lores[0]).variables[args.downscale_lores[1]].data.squeeze(),
+            netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze()
+        )
+        fout = netcdf.netcdf_file(args.ofile, "a")
+        downscaled_temp = fout.createVariable("air_temp_downscaled", 'f8',
+                                              ("y", "x"))
+
+        downscaled_temp[:] = field_hi
+    else:
+        logging.error("Downscaling not available!")
+
+
+#############
+# MAIN STUFF
+#############
+        
 def main():
     args = parse_arguments()
     # print args
@@ -186,17 +244,17 @@ def main():
         remap(args)
     if args.command == "prep_file_atmo":
         prep_file_atmo(args)
-    # if downscale_available:
-    #     field_hi = downscale_field(
-    #         netcdf.netcdf_file(args.ofile).variables[args.ifile_gcm[1]].data.squeeze(),
-    #         netcdf.netcdf_file(args.downscale_hires[0]).variables[args.downscale_hires[1]].data.squeeze(),
-    #         netcdf.netcdf_file(args.downscale_lores[0]).variables[args.downscale_lores[1]].data.squeeze(),
-    #         netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze()
-    #     )
-    # else:
-    #     logging.error("Downscaling not available!")
-
+    if args.command == "downscale":
+        downscale(args)
+    
 if __name__ == '__main__':
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         main()
+
+
+#################
+# END OF PROGRAM
+#################
+
+# Paul J. Gierz, AWI Bremerhaven
