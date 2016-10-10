@@ -52,7 +52,7 @@ class MyFormatter(logging.Formatter):
     dbg_fmt = bcolors.WARNING + \
         "DBG: %(module)s: %(lineno)d: %(msg)s" + bcolors.ENDC
     info_fmt = bcolors.OKGREEN + "INFO: %(msg)s" + bcolors.ENDC
-    warn_fmt = bcolors.FAIL + "FAILURE: %(msg)s" + bcolors.ENDC
+    warn_fmt = bcolors.FAIL + "WARNING: %(msg)s" + bcolors.ENDC
 
     def __init__(self, fmt="%(levelno)s: %(msg)s"):
         logging.Formatter.__init__(self, fmt)
@@ -178,6 +178,11 @@ def prep_file_atmo(args):
     # Make X and Y
     ############################################################
     # TODO: This still needs to be done in some clever-ish way
+    # For now, tell the user to do it by hand:
+    logging.warn("The X and Y coordinates are not defined in this gcm_outputfile.")
+    logging.warn("They need to be added by copying from the PISM input file:")
+    logging.warn("ncks -c,x,y ${pism_inputfile} foo.nc")
+    logging.warn("ncks -A foo.nc ${gcm_outputfile}")
     ############################################################
     air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
                                                ('y', 'x'))
