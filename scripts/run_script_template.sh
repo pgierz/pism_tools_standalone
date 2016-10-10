@@ -33,6 +33,7 @@ echo "This PISM run was perfomed on $HOSTNAME on $(date)"
 # Paul J. Gierz, Mon Jul 26 10:12:41 2016                                      #
 # Paul J. Gierz, Tue Jul 26 16:30:32 2016                                      #
 # Paul J. Gierz, Wed Jul 27 10:59:38 2016                                      #
+# Paul J. Gierz, Fri Oct  7 10:52:57 2016                                      #
 # -----------------------------------------------------------------------------#
 # AWI Bremerhaven                                                              #
 ################################################################################
@@ -108,8 +109,11 @@ then
     skip_max=20
 elif [[ $res == "high" ]]
 then
-    echo "$0 Error: High resolution not set yet!"
-    exit 42
+    xres_ice=301
+    yres_ice=561
+    zres_ice=201
+    bz=21
+    skip_max=40
 else
     echo "$0 Error: A resolution was selected that is not predefined"
     exit 42
@@ -128,7 +132,7 @@ Lbz=2000
 resolution_opt="-Mx $xres_ice -My $yres_ice -Mz $zres_ice -Mbz $bz -z_spacing $z_spacing_opt -Lz $Lz -Lbz $Lbz -skip -skip_max $skip_max "
 
 #########################################################
-# RESTART (Regrid?? why the fuck is this called regrid?)
+# RESTART (Regrid?? why is this called regrid?)
 #########################################################
 regrid=1			# True 1; False 0
 if [[ $regrid -eq 1 ]]
@@ -192,7 +196,10 @@ case $atmosphere in
 	;;
     "yearly_cycle")
 	echo "Atmosphere --> Ice coupling type being used: |>>> yearly_cycle <<<|"
-	echo "Atmosphere coupler for this type not implemented, please go whack Paul over the head to fix this..."
+	atmo_flag=" -atmosphere yearly_cycle"
+	extra_file=${indir}/atmo_yearly_cycle_file.nc
+	atmo_flag_extra=" -atmosphere_yearly_cycle_file ${extra_file}"
+	echo "Testing only so far..."
 	;;
     "searise_greenland")
 	echo "Atmosphere --> Ice coupling type being used: |>>> searise_greenland <<<|"
@@ -268,7 +275,7 @@ case $surface_opt in
 	echo "surface type for $surface_opt not implemented, please go whack Paul over the head to fix this..."
 	;;
     "pdd")
-	# Fuck this one is complicated...
+	# this one is complicated...
 	pdd_sd_file=pdd_sd_file.nc
 	# pdd_sd_period (years?)
 	# pdd_sd_reference_year
