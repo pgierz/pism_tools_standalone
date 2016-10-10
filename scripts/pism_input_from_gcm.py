@@ -175,9 +175,15 @@ def prep_file_atmo(args):
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
+    # Make X and Y
+    ############################################################
+
+    
+    ############################################################
     air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
                                                ('y', 'x'))
     air_temp_mean_annual.standard_name = "air_temperature"
+    air_temp_mean_annual.units = "K"
     air_temp_mean_annual.long_name = "Annual Mean Air Temperature (2 meter)"
     air_temp_mean_annual.grid_mapping = "mapping"
     air_temp_mean_annual.coordinates = "lon lat"
@@ -187,6 +193,7 @@ def prep_file_atmo(args):
     air_temp_mean_july = fout.createVariable("air_temp_mean_july", 'f8',
                                              ('y', 'x'))
     air_temp_mean_july.standard_name = "air_temperature"
+    air_temp_mean_july.units = "K"
     air_temp_mean_july.long_name = "July Mean Air Temperature (2 meter)"
     air_temp_mean_july.grid_mapping = "mapping"
     air_temp_mean_july.coordinates = "lon lat"
