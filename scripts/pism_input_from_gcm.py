@@ -27,7 +27,12 @@ except ImportError:
     raise ImportError(
         "cdo-python interface could not be found. " +
         "Try installing it via: \n pip install --user cdo")
-
+try:
+    import nco
+except ImportError:
+    raise ImportError(
+        "nco-python interface could not be found. " +
+        "Try installing it via: \n pip install --user nco")
 
 ###############
 # LOGGER STUFF
@@ -151,6 +156,7 @@ def parse_arguments():
     ##########################################################################
     atmosphere_top = subparsers.add_parser("prep_file_atmo",
                                            help="Prepares GCM netcdf files to work in PISM")
+    atmosphere_top.add_argument("pism_ifile", help="The pism input file this atmosphere forcing will be used with")
     atmosphere_group = atmosphere_top.add_subparsers(dest="atmo_command")
     ##############################
     atmosphere_yearly_cycle_group = atmosphere_group.add_parser("yearly_cycle",
@@ -240,6 +246,9 @@ def yearly_cycle_atmo(args):
     logging.warn("They need to be added by copying from the PISM input file:")
     logging.warn("ncks -c,x,y ${pism_inputfile} foo.nc")
     logging.warn("ncks -A foo.nc ${gcm_outputfile}")
+    NCO = nco.Nco()
+    temp_ofile = NCO.nkcs(options="-c,x,y", ifile=args.pism_ifile)
+    NCO.nkcs("-A", ifile=[temp_ofile, fout.filename])
     ############################################################
     # Make Annual Surface Temp
     ############################################################
