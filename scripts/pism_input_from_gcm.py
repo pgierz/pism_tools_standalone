@@ -98,9 +98,14 @@ def _parse_file_and_var(s):
 
 
 def parse_arguments():
+    """
+    This function looks scary. It just gets command line arguments
+
+    Paul J. Gierz, Tue Oct 11 13:12:43 2016
+    """
     ##########################################################################
     parser = argparse.ArgumentParser(description='Generates ISM inputs from GCM output. Designed for PISM, but could possibly serve other purposes as well.',
-                                     epilog="Paul J. Gierz, AWI Bremerhaven")
+                                     epilog="Version: 0.1.0 \n Paul J. Gierz, AWI Bremerhaven")
     parser.add_argument("-o", "--ofile", help="The filename of the output file, " +
                         "defaults to ofile.nc",
                         default="ofile.nc")
@@ -111,25 +116,23 @@ def parse_arguments():
                         action="store_const", dest="loglevel", const=logging.INFO)
     subparsers = parser.add_subparsers(dest="command")
     ##########################################################################
-    
-    interpolation_parser_group = subparsers.add_parser("remap",
-                                                       help="Options that need to be provided for the 1st order conservative remapping to a ISM grid via cdo remapcon")
-    interpolation_parser_group.add_argument('-igcm', '--ifile_gcm',
-                                            required=True,
-                                            help="The \"input\" file to use from the GCM")
-    interpolation_parser_group.add_argument('-igrid', '--ifile_griddes',
-                                            required=True,
-                                            help="The grid description you want to use, either built into CDO directly, or from a griddes file")
+    remap_parser_group = subparsers.add_parser("remap",
+                                               help="Options that need to be provided for the 1st order conservative remapping to a ISM grid via cdo remapcon")
+    remap_parser_group.add_argument('-igcm', '--ifile_gcm',
+                                    required=True,
+                                    help="The \"input\" file to use from the GCM")
+    remap_parser_group.add_argument('-igrid', '--ifile_griddes',
+                                    required=True,
+                                    help="The grid description you want to use, either built into CDO directly, or from a griddes file")
     ##########################################################################
-    atmosphere_yearly_cycle_group = subparsers.add_parser("prep_file_atmo",
-                                                          help = "Prepares GCM netcdf files to work in PISM" )
-    atmosphere_yearly_cycle_group.add_argument("-itemp", "--ifile_temperature",
-                                               required=True,
-                                               help="The file containing a yearly cycle of temperature, already on PISM grid")
-    atmosphere_yearly_cycle_group.add_argument("-iprecip", "--ifile_precipitation",
-                                               required=True,
-                                               help="The file containing a yearly cycle of precipitation on PISM grid")
-    
+    interpolate_parser_group = subparsers.add_parser("interpolate",
+                                                     help="Interpolates a field via cdo remapbil, works similarly to remap command")
+    interpolate_parser_group.add_argument('-igcm', '--ifile_gcm',
+                                          required=True,
+                                          help="The \"input\" file to use from the GCM")
+    interpolate_parser_group.add_argument('-igrid', '--ifile_griddes',
+                                          required=True,
+                                          help="The grid description you want to use, either built into CDO directly, or from a griddes file")
     ##########################################################################
     downscale_parser_group = subparsers.add_parser("downscale",
                                                    help="Options that need to be provided for downscaling of GCM outputs to fine grids")
@@ -142,6 +145,51 @@ def parse_arguments():
     downscale_parser_group.add_argument("-dmask", "--downscale_mask",
                                         type=_parse_file_and_var,
                                         help="Downscale mask (file,variable)")
+    ##########################################################################
+    ##########################################################################
+    # TODO: Find out which of these is not needed
+    ##########################################################################
+    atmosphere_top = subparsers.add_parser("prep_file_atmo",
+                                           help="Prepares GCM netcdf files to work in PISM")
+    atmosphere_group = atmosphere_top.add_subparsers(dest="atmo_command")
+    ##############################
+    atmosphere_yearly_cycle_group = atmosphere_group.add_parser("yearly_cycle",
+                                                                help="Make files for pism \"yearly_cycle\" atmosphere coupling")
+    atmosphere_yearly_cycle_group.add_argument("-itemp", "--ifile_temperature",
+                                               required=True,
+                                               help="The file containing a yearly cycle of temperature, already on PISM grid")
+    atmosphere_yearly_cycle_group.add_argument("-iprecip", "--ifile_precipitation",
+                                               required=True,
+                                               help="The file containing a yearly cycle of precipitation on PISM grid")
+    ##############################
+    atmosphere_given_group = atmosphere_group.add_parser("given",
+                                                         help="Make files for pism \"given\" atmosphere coupling")
+    atmosphere_given_group.add_argument("-itemp", "--ifile_temperature",
+                                        required=True,
+                                        help="The file containing a yearly cycle of temperature, already on PISM grid")
+    atmosphere_given_group.add_argument("-iprecip", "--ifile_precipitation",
+                                        required=True,
+                                        help="The file containing a yearly cycle of precipitation on PISM grid")
+    ##############################
+    atmosphere_searise_greenland_group = atmosphere_group.add_parser("searise_greenland",
+                                                                     help="Make files for pism \"searise_greenland\" atmosphere coupling")
+    atmosphere_searise_greenland_group.add_argument("-itemp", "--ifile_temperature",
+                                                    required=True,
+                                                    help="The file containing a yearly cycle of temperature, already on PISM grid")
+    atmosphere_searise_greenland_group.add_argument("-iprecip", "--ifile_precipitation",
+                                                    required=True,
+                                                    help="The file containing a yearly cycle of precipitation on PISM grid")
+    ##############################
+    atmosphere_one_station_group = atmosphere_group.add_parser("one_station",
+                                                               help="Make files for pism \"one_station\" atmosphere coupling")
+    atmosphere_one_station_group.add_argument("-itemp", "--ifile_temperature",
+                                              required=True,
+                                              help="The file containing a yearly cycle of temperature, already on PISM grid")
+    atmosphere_one_station_group.add_argument("-iprecip", "--ifile_precipitation",
+                                              required=True,
+                                              help="The file containing a yearly cycle of precipitation on PISM grid")
+    ##########################################################################
+    ##########################################################################
     ##########################################################################
     return parser.parse_args()
 
@@ -159,17 +207,26 @@ class pism_output_file(object):
 # FUNCTIONS
 ############
 def remap(args):
-        CDO = cdo.Cdo()
-        if not os.path.exists(args.ofile):
-            CDO.remapcon(args.ifile_griddes, input=args.ifile_gcm,
-                         output=args.ofile, options="-f nc -v")
-            logging.info("Outfile generated here: %s" % (args.ofile))
-        else:
-            logging.info("Outfile exists here: %s" % (args.ofile))
+    CDO = cdo.Cdo()
+    if not os.path.exists(args.ofile):
+        CDO.remapcon(args.ifile_griddes, input=args.ifile_gcm,
+                     output=args.ofile, options="-f nc -v")
+        logging.info("Outfile generated here: %s" % (args.ofile))
+    else:
+        logging.info("Outfile exists here: %s" % (args.ofile))
 
 
-def prep_file_atmo(args):
-    # TODO: Implement TYPES of atmosphere prep
+def interpolate(args):
+    CDO = cdo.Cdo()
+    if not os.path.exists(args.ofile):
+        CDO.remapbil(args.ifile_griddes, input=args.ifile_gcm,
+                     output=args.ofile, options="-f nc -v")
+        logging.info("Outfile generated here: %s" % (args.ofile))
+    else:
+        logging.info("Outfile exists here: %s" % (args.ofile))
+
+
+def yearly_cycle_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
     shutil.copy(fin_temp.filename, args.ofile)
@@ -183,6 +240,8 @@ def prep_file_atmo(args):
     logging.warn("They need to be added by copying from the PISM input file:")
     logging.warn("ncks -c,x,y ${pism_inputfile} foo.nc")
     logging.warn("ncks -A foo.nc ${gcm_outputfile}")
+    ############################################################
+    # Make Annual Surface Temp
     ############################################################
     air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
                                                ('y', 'x'))
@@ -221,7 +280,7 @@ def prep_file_atmo(args):
     fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
     fout.sync()
 
-
+    
 def downscale(args):
     if downscale_available:
         field_hi = downscale_field(
@@ -242,22 +301,24 @@ def downscale(args):
 #############
 # MAIN STUFF
 #############
-        
+# The main function is actually deceptively small
 def main():
     args = parse_arguments()
-    # print args
     fmt = MyFormatter()
     hdlr = logging.StreamHandler(sys.stdout)
     hdlr.setFormatter(fmt)
     logging.root.addHandler(hdlr)
-    logging.root.setLevel(args.loglevel)
+    logging.root.setLevel(args.loglevel)    
     if args.command == "remap":
         remap(args)
+    if args.command == "interpolate":
+        interpolate(args)
     if args.command == "prep_file_atmo":
-        prep_file_atmo(args)
+        if args.atmo_command == "yearly_cycle":
+            yearly_cycle_atmo(args)
     if args.command == "downscale":
         downscale(args)
-    
+
 if __name__ == '__main__':
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
