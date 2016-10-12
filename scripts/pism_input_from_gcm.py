@@ -38,6 +38,7 @@ except ImportError:
 # LOGGER STUFF
 ###############
 
+
 # Colors for logger
 class bcolors:
     HEADER = '\033[95m'
@@ -238,21 +239,9 @@ def yearly_cycle_atmo(args):
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
-    # Make X and Y
-    ############################################################
-    # TODO: This still needs to be done in some clever-ish way
-    # For now, tell the user to do it by hand:
-    logging.warn("The X and Y coordinates are not defined in this gcm_outputfile.")
-    logging.warn("They need to be added by copying from the PISM input file:")
-    logging.warn("ncks -c,x,y ${pism_inputfile} foo.nc")
-    logging.warn("ncks -A foo.nc ${gcm_outputfile}")
-    NCO = nco.Nco()
-    temp_ofile = NCO.nkcs(options="-c,x,y", ifile=args.pism_ifile)
-    NCO.nkcs("-A", ifile=[temp_ofile, fout.filename])
-    ############################################################
     # Make Annual Surface Temp
     ############################################################
-    air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", 'f8',
+    air_temp_mean_annual = fout.createVariable("air_temp_mean_annual", float,
                                                ('y', 'x'))
     air_temp_mean_annual.standard_name = "air_temperature"
     air_temp_mean_annual.units = "K"
@@ -262,7 +251,9 @@ def yearly_cycle_atmo(args):
     air_temp_mean_annual[:] = fin_temp.variables["temp2"].data.mean(axis=0)
 
     ############################################################
-    air_temp_mean_july = fout.createVariable("air_temp_mean_july", 'f8',
+    # July Mean Surface Temp
+    ############################################################
+    air_temp_mean_july = fout.createVariable("air_temp_mean_july", float,
                                              ('y', 'x'))
     air_temp_mean_july.standard_name = "air_temperature"
     air_temp_mean_july.units = "K"
@@ -271,24 +262,52 @@ def yearly_cycle_atmo(args):
     air_temp_mean_july.coordinates = "lon lat"
     air_temp_mean_july[:] = fin_temp.variables["temp2"].data[6, :, :]
     ############################################################
-    precipitation = fout.createVariable("precipitation", 'f8',
+    # Precipitation 
+    ############################################################
+    precipitation = fout.createVariable("precipitation", float,
                                         ('y', 'x'))
     precipitation.units = "m s-1"
     precipitation.long_name = "Yearly mean total precipitation"
     precipitation.standard_name = "lwe_precipitation_rate"
     precipitation._FillValue = "-9.e+33f"
-    p = fin_precip.variables["precip"].data.mean(axis=0)
-    p = p/910.  # PG: Convert from kg/m^2s => m/s ice equivalent, see NOTE
+    p = fin_precip.variables["precip"].data.mean(axis=0)# PG: This is
+                                                        # yearly
+                                                        # average,
+                                                        # maybe better
+                                                        # to use a
+                                                        # full cycle
+    p = p/910.  # PG: Convert from kg/m^2s => m/s ice equivalent, see
+                # NOTE
     precipitation[:] = p
     ############################################################
     # NOTE: Someone needs to confirm this
     # p [kg/m^-2 * s] = [1 l/s] = [1 mm/s] * rho_liquid / rho_solid * 1 [m] / 1000 [mm] = p [m_ice/s]
     ############################################################
+    # Make X and Y
+    ############################################################
+    # TODO: This still needs to be done in some clever-ish way
+    # For now, tell the user to do it by hand:
+    # logging.warn("The X and Y coordinates are not defined in this gcm_outputfile.")
+    # logging.warn("They need to be added by copying from the PISM input file:")
+    # logging.warn("ncks -c ${pism_inputfile} foo.nc")
+    # logging.warn("ncks -A foo.nc ${gcm_outputfile}")
+    logging.warn("Trying to do NCO by python-nco interface...")
+    # PG: The NCO part has not yet been tested
+    NCO = nco.Nco()
+    temp_ofile = NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
+    inputfiles = " ".join([temp_ofile, fout.filename])
+    # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
+    os.system("ncks -q -A foo.nc "+fout.filename)
+    logging.warn("The warning just produced by ncks at this point does not cause any problems")
+    ############################################################
+    # Save the output and add some info
+    ############################################################
     fout.author = "Paul J. Gierz"
     fout.institution = "Alfred Wegener Institute"
     fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
     fout.sync()
-
+    ############################################################
+    return None
     
 def downscale(args):
     if downscale_available:
@@ -299,7 +318,7 @@ def downscale(args):
             netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze()
         )
         fout = netcdf.netcdf_file(args.ofile, "a")
-        downscaled_temp = fout.createVariable("air_temp_downscaled", 'f8',
+        downscaled_temp = fout.createVariable("air_temp_downscaled", float,
                                               ("y", "x"))
 
         downscaled_temp[:] = field_hi
