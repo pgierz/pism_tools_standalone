@@ -283,6 +283,17 @@ def yearly_cycle_atmo(args):
     # NOTE: Someone needs to confirm this
     # p [kg/m^-2 * s] = [1 l/s] = [1 mm/s] * rho_liquid / rho_solid * 1 [m] / 1000 [mm] = p [m_ice/s]
     ############################################################
+    # Save the output and add some info
+    #
+    # PG: File needs to be saved first, otherwise none of the new data
+    # will be written to it.
+    #
+    ############################################################
+    fout.author = "Paul J. Gierz"
+    fout.institution = "Alfred Wegener Institute"
+    fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
+    fout.sync()
+    ############################################################
     # Make X and Y
     ############################################################
     # TODO: This still needs to be done in some clever-ish way
@@ -295,17 +306,12 @@ def yearly_cycle_atmo(args):
     # PG: The NCO part has not yet been tested
     NCO = nco.Nco()
     temp_ofile = NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
+    NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
     inputfiles = " ".join([temp_ofile, fout.filename])
     # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
-    os.system("ncks -q -A foo.nc "+fout.filename)
+    os.system("ncks -q -A foo1.nc "+fout.filename)
+    os.system("rm foo.nc foo1.nc")
     logging.warn("The warning just produced by ncks at this point does not cause any problems")
-    ############################################################
-    # Save the output and add some info
-    ############################################################
-    fout.author = "Paul J. Gierz"
-    fout.institution = "Alfred Wegener Institute"
-    fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
-    fout.sync()
     ############################################################
     return None
     
