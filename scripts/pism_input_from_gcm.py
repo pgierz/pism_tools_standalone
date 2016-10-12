@@ -233,6 +233,55 @@ def interpolate(args):
         logging.info("Outfile exists here: %s" % (args.ofile))
 
 
+def given_atmo(args):
+    fin_temp = netcdf.netcdf_file(args.ifile_temperature)
+    fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
+    shutil.copy(fin_temp.filename, args.ofile)
+    fout = netcdf.netcdf_file(args.ofile, "a")
+    ############################################################
+    # Write Air Temperature
+    ############################################################
+    air_temp = fout.createVariable("air_temp", float, ("time", 'y', 'x'))
+    air_temp.standard_name = "air_temperature"
+    air_temp.units = "K"
+    air_temp.long_name = "Air Temperature (2 meter)"
+    air_temp.grid_mapping = "mapping"
+    air_temp.coordinates = "lon lat"
+    air_temp[:] = fin_temp.variables["temp2"].data
+    ############################################################
+    # Write Precipitation
+    ############################################################
+    precip = fout.createVariable("precipitation", float, ("time", 'y', 'x'))
+    precip.units = "m s-1"
+    precip.long_name = "Yearly mean total precipitation"
+    precip.standard_name = "lwe_precipitation_rate"
+    precip._FillValue = "-9.e+33f"
+    p = fin_precip.variables["precip"].data
+    p = p/910.
+    precip[:] = p
+    ############################################################
+    # Write output
+    ############################################################
+    fout.author = "Paul J. Gierz"
+    fout.institution = "Alfred Wegener Institute"
+    fout.history = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+" Modified with script:\n pism_input_from_gcm.py prep_file_atmo "+fin_temp.filename+" "+fin_precip.filename+"\n"+fout.history
+    fout.sync()
+    ############################################################
+    # Make X and Y
+    ############################################################
+    logging.warn("Trying to do NCO by python-nco interface...")
+    NCO = nco.Nco()
+    temp_ofile = NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
+    NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
+    inputfiles = " ".join([temp_ofile, fout.filename])
+    # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
+    os.system("ncks -q -A foo1.nc "+fout.filename)
+    os.system("rm foo.nc foo1.nc")
+    logging.warn("The warning just produced by ncks at this point does not cause any problems")
+    ############################################################
+    return None
+
+
 def yearly_cycle_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
@@ -248,6 +297,7 @@ def yearly_cycle_atmo(args):
     air_temp_mean_annual.long_name = "Annual Mean Air Temperature (2 meter)"
     air_temp_mean_annual.grid_mapping = "mapping"
     air_temp_mean_annual.coordinates = "lon lat"
+    air_temp_mean_annual._FillValue = "-9.e+33f"
     air_temp_mean_annual[:] = fin_temp.variables["temp2"].data.mean(axis=0)
 
     ############################################################
@@ -260,6 +310,7 @@ def yearly_cycle_atmo(args):
     air_temp_mean_july.long_name = "July Mean Air Temperature (2 meter)"
     air_temp_mean_july.grid_mapping = "mapping"
     air_temp_mean_july.coordinates = "lon lat"
+    air_temp_mean_july._FillValue = "-9.e+33f"
     air_temp_mean_july[:] = fin_temp.variables["temp2"].data[6, :, :]
     ############################################################
     # Precipitation 
@@ -348,6 +399,8 @@ def main():
     if args.command == "interpolate":
         interpolate(args)
     if args.command == "prep_file_atmo":
+        if args.atmo_command == "given":
+            given_atmo(args)
         if args.atmo_command == "yearly_cycle":
             yearly_cycle_atmo(args)
     if args.command == "downscale":
