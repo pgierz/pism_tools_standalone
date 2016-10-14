@@ -235,7 +235,11 @@ def interpolate(args):
 
 def given_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
+    if fin_temp.source == "ECHAM5.4":
+        tempvarname = "temp2"
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
+    if fin_precip.source == "ECHAM5.4":
+        precipvarname = "precip"
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
@@ -247,7 +251,7 @@ def given_atmo(args):
     air_temp.long_name = "Air Temperature (2 meter)"
     air_temp.grid_mapping = "mapping"
     air_temp.coordinates = "lon lat"
-    air_temp[:] = fin_temp.variables["temp2"].data
+    air_temp[:] = fin_temp.variables[tempvarname].data
     ############################################################
     # Write Precipitation
     ############################################################
@@ -256,7 +260,7 @@ def given_atmo(args):
     precip.long_name = "Yearly mean total precipitation"
     precip.standard_name = "lwe_precipitation_rate"
     precip._FillValue = "-9.e+33f"
-    p = fin_precip.variables["precip"].data
+    p = fin_precip.variables[precipvarname].data
     p = p/910.
     precip[:] = p
     ############################################################
@@ -271,9 +275,9 @@ def given_atmo(args):
     ############################################################
     logging.warn("Trying to do NCO by python-nco interface...")
     NCO = nco.Nco()
-    temp_ofile = NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
+    NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
     NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
-    inputfiles = " ".join([temp_ofile, fout.filename])
+    # inputfiles = " ".join([temp_ofile, fout.filename])
     # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
     os.system("ncks -q -A foo1.nc "+fout.filename)
     os.system("rm foo.nc foo1.nc")
@@ -284,7 +288,11 @@ def given_atmo(args):
 
 def yearly_cycle_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
+    if fin_temp.source == "ECHAM5.4":
+        tempvarname = "temp2"
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
+    if fin_precip.source == "ECHAM5.4":
+        precipvarname = "precip"
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
@@ -298,7 +306,7 @@ def yearly_cycle_atmo(args):
     air_temp_mean_annual.grid_mapping = "mapping"
     air_temp_mean_annual.coordinates = "lon lat"
     air_temp_mean_annual._FillValue = "-9.e+33f"
-    air_temp_mean_annual[:] = fin_temp.variables["temp2"].data.mean(axis=0)
+    air_temp_mean_annual[:] = fin_temp.variables[tempvarname].data.mean(axis=0)
 
     ############################################################
     # July Mean Surface Temp
@@ -311,9 +319,9 @@ def yearly_cycle_atmo(args):
     air_temp_mean_july.grid_mapping = "mapping"
     air_temp_mean_july.coordinates = "lon lat"
     air_temp_mean_july._FillValue = "-9.e+33f"
-    air_temp_mean_july[:] = fin_temp.variables["temp2"].data[6, :, :]
+    air_temp_mean_july[:] = fin_temp.variables[tempvarname].data[6, :, :]
     ############################################################
-    # Precipitation 
+    # Precipitation
     ############################################################
     precipitation = fout.createVariable("precipitation", float,
                                         ('y', 'x'))
@@ -321,14 +329,9 @@ def yearly_cycle_atmo(args):
     precipitation.long_name = "Yearly mean total precipitation"
     precipitation.standard_name = "lwe_precipitation_rate"
     precipitation._FillValue = "-9.e+33f"
-    p = fin_precip.variables["precip"].data.mean(axis=0)# PG: This is
-                                                        # yearly
-                                                        # average,
-                                                        # maybe better
-                                                        # to use a
-                                                        # full cycle
-    p = p/910.  # PG: Convert from kg/m^2s => m/s ice equivalent, see
-                # NOTE
+    p = fin_precip.variables[precipvarname].data.mean(axis=0)
+    # PG: This is yearly average, maybe better to use a full cycle
+    p = p/910.  # PG: Convert from kg/m^2s => m/s ice equivalent, see NOTE
     precipitation[:] = p
     ############################################################
     # NOTE: Someone needs to confirm this
@@ -356,16 +359,17 @@ def yearly_cycle_atmo(args):
     logging.warn("Trying to do NCO by python-nco interface...")
     # PG: The NCO part has not yet been tested
     NCO = nco.Nco()
-    temp_ofile = NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
+    NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
     NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
-    inputfiles = " ".join([temp_ofile, fout.filename])
+    # inputfiles = " ".join([temp_ofile, fout.filename])
     # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
     os.system("ncks -q -A foo1.nc "+fout.filename)
     os.system("rm foo.nc foo1.nc")
     logging.warn("The warning just produced by ncks at this point does not cause any problems")
     ############################################################
     return None
-    
+
+
 def downscale(args):
     if downscale_available:
         field_hi = downscale_field(
@@ -393,7 +397,7 @@ def main():
     hdlr = logging.StreamHandler(sys.stdout)
     hdlr.setFormatter(fmt)
     logging.root.addHandler(hdlr)
-    logging.root.setLevel(args.loglevel)    
+    logging.root.setLevel(args.loglevel)
     if args.command == "remap":
         remap(args)
     if args.command == "interpolate":
@@ -403,8 +407,14 @@ def main():
             given_atmo(args)
         if args.atmo_command == "yearly_cycle":
             yearly_cycle_atmo(args)
-    if args.command == "downscale":
-        downscale(args)
+        if args.atmo_command == "searise_greenland":
+            logging.critical("searise_greenland atmosphere file prep not implemented, exiting! \n (Paul thought it wasn't useful...)")
+            sys.exit(42)        # Because 42 is the answer
+        if args.atmo_command == "one_station":
+            logging.critical("one_station atmosphere file prep not implemented, exiting! \n (Paul thought it wasn't useful...)")
+            sys.exit(42)
+        if args.command == "downscale":
+            downscale(args)
 
 if __name__ == '__main__':
     with warnings.catch_warnings():
