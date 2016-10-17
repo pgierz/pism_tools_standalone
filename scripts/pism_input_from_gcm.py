@@ -180,21 +180,9 @@ def parse_arguments():
     ##############################
     atmosphere_searise_greenland_group = atmosphere_group.add_parser("searise_greenland",
                                                                      help="Make files for pism \"searise_greenland\" atmosphere coupling")
-    atmosphere_searise_greenland_group.add_argument("-itemp", "--ifile_temperature",
-                                                    required=True,
-                                                    help="The file containing a yearly cycle of temperature, already on PISM grid")
-    atmosphere_searise_greenland_group.add_argument("-iprecip", "--ifile_precipitation",
-                                                    required=True,
-                                                    help="The file containing a yearly cycle of precipitation on PISM grid")
     ##############################
     atmosphere_one_station_group = atmosphere_group.add_parser("one_station",
                                                                help="Make files for pism \"one_station\" atmosphere coupling")
-    atmosphere_one_station_group.add_argument("-itemp", "--ifile_temperature",
-                                              required=True,
-                                              help="The file containing a yearly cycle of temperature, already on PISM grid")
-    atmosphere_one_station_group.add_argument("-iprecip", "--ifile_precipitation",
-                                              required=True,
-                                              help="The file containing a yearly cycle of precipitation on PISM grid")
     ##########################################################################
     ##########################################################################
     ##########################################################################
@@ -393,6 +381,7 @@ def downscale(args):
 # The main function is actually deceptively small
 def main():
     args = parse_arguments()
+    not_impl_str = "not implemented, exiting! \n (Paul thought it wasn't useful...)"
     fmt = MyFormatter()
     hdlr = logging.StreamHandler(sys.stdout)
     hdlr.setFormatter(fmt)
@@ -408,10 +397,10 @@ def main():
         if args.atmo_command == "yearly_cycle":
             yearly_cycle_atmo(args)
         if args.atmo_command == "searise_greenland":
-            logging.critical("searise_greenland atmosphere file prep not implemented, exiting! \n (Paul thought it wasn't useful...)")
+            logging.critical("%s  %s  :" + not_impl_str) % (args.command, args.atmo_command)
             sys.exit(42)        # Because 42 is the answer
         if args.atmo_command == "one_station":
-            logging.critical("one_station atmosphere file prep not implemented, exiting! \n (Paul thought it wasn't useful...)")
+            logging.critical("%s  %s  :" + not_impl_str) % (args.command, args.atmo_command)
             sys.exit(42)
         if args.command == "downscale":
             downscale(args)
