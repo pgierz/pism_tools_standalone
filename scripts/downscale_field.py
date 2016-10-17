@@ -164,8 +164,8 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
                         if (max_elev_lo == min_elev_lo):
                             field_hi[i+l, j+k] = field_lo[i+l, j+k]
                         else:
-                            lapse = (min_field_lo - max_field_lo)/(max_elev_lo - min_elev_lo)
-                            field_hi[i+l, j+k] = lapse * (elev_hi[i+l, j+k] - elev_lo[i+l, j+k]) + field_lo[i+l, j+k]
+                            lapse_lo = (min_field_lo - max_field_lo)/(max_elev_lo - min_elev_lo)
+                            field_hi[i+l, j+k] = lapse_lo * (elev_hi[i+l, j+k] - elev_lo[i+l, j+k]) + field_lo[i+l, j+k]
     if (counter > 0):
         logging.warning("Neither condition was used %s times" % counter)
     logging.info("Finished! Time was %s" % str(time.time()-now))
