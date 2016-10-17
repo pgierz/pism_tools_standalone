@@ -225,9 +225,21 @@ def given_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
     if fin_temp.source == "ECHAM5.4":
         tempvarname = "temp2"
+    elif fin_temp.source == "ECHAM6":
+        tempvarname = "temp2"
+    else:
+        logging.warn("Model unknown, waiting for user response...")
+        print fin_temp.variables
+        tempvarname = input("What is the temperature varname you want to use? ")
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
     if fin_precip.source == "ECHAM5.4":
         precipvarname = "precip"
+    elif fin_precip.source == "ECHAM6":
+        precipvarname = "precip"
+    else:
+        logging.warn("Model unknown, waiting for user response...")
+        print fin_precip.variables
+        precipvarname = input("What is the precip varname you want to use? ")
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
@@ -278,9 +290,21 @@ def yearly_cycle_atmo(args):
     fin_temp = netcdf.netcdf_file(args.ifile_temperature)
     if fin_temp.source == "ECHAM5.4":
         tempvarname = "temp2"
+    elif fin_temp.source == "ECHAM6":
+        tempvarname = "temp2"
+    else:
+        logging.warn("Model unknown, waiting for user response...")
+        print fin_temp.variables
+        tempvarname = input("What is the temperature varname you want to use? ")
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
     if fin_precip.source == "ECHAM5.4":
         precipvarname = "precip"
+    elif fin_precip.source == "ECHAM6":
+        precipvarname = "precip"
+    else:
+        logging.warn("Model unknown, waiting for user response...")
+        print fin_precip.variables
+        precipvarname = input("What is the precip varname you want to use? ")
     shutil.copy(fin_temp.filename, args.ofile)
     fout = netcdf.netcdf_file(args.ofile, "a")
     ############################################################
