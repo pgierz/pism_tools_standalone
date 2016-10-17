@@ -5,7 +5,7 @@
 #SBATCH --job-name=PISM_Test
 #SBATCH -p mpp
 #SBATCH --ntasks=144
-#SBATCH --time=1:00:00
+#SBATCH --time=12:00:00
 ################################################################################
 echo "This PISM run was perfomed on $HOSTNAME on $(date)"
 ################################################################################
@@ -34,6 +34,7 @@ echo "This PISM run was perfomed on $HOSTNAME on $(date)"
 # Paul J. Gierz, Tue Jul 26 16:30:32 2016                                      #
 # Paul J. Gierz, Wed Jul 27 10:59:38 2016                                      #
 # Paul J. Gierz, Fri Oct  7 10:52:57 2016                                      #
+# Paul J. Gierz, Wed Oct 12 15:44:25 2016                                      #
 # -----------------------------------------------------------------------------#
 # AWI Bremerhaven                                                              #
 ################################################################################
@@ -69,22 +70,50 @@ workdir=${homedir}/${expid}/work
 pooldir=/work/ollie/pgierz/pool_pism/
 subpool=examples_greenland
 
-numproc=4			# Number of processors to use
+numproc=8			# Number of processors to use
 execution_command="srun --mpi=pmi2"
 
-# Input File Name:
-input_file_name=pism_Greenland_5km_v1.1.nc
 
-# Bootstrapping?
-bootstrap=1
+# Time Control
+start_year=-10000
+end_year=0
+step_year=100
+
+
+if [ ! -f ${expid}.date ]
+then
+    run_number=0
+else
+    run_number=$(cat ${expid}.date)
+fi
+
+
+if [[ $run_number -eq 0 ]]
+then
+    bootstrap=1
+    # Input File Name:
+    input_file_name=pism_Greenland_5km_v1.1.nc
+    current_year=$start_year
+else
+    bootstrap=0
+    # Input File name needs to be the output of the last run
+    input_file_name=$(head -1 | ls ${outdir}/${expid}_${icemod}_main_*.nc)
+    current_year=$( expr ${start_year} + ${step_year} \* ${run_number} )
+fi
+
+current_end=$( expr ${current_year} + ${step_year} )
+
+if [[ $current_year -gt ${end_year} ]]
+then
+    echo "EXPERIMENT FOR ${expid} OVER!"
+    exit
+fi
+      
 if [[ $bootstrap -eq 1 ]]
 then
     bootstrap_opt="-bootstrap"
 fi
 
-# Time Control
-start_year=-10000
-end_year=0
 
 #############################################
 #                     RESOLUTION OPTIONS    
@@ -132,9 +161,9 @@ Lbz=2000
 resolution_opt="-Mx $xres_ice -My $yres_ice -Mz $zres_ice -Mbz $bz -z_spacing $z_spacing_opt -Lz $Lz -Lbz $Lbz -skip -skip_max $skip_max "
 
 #########################################################
-# RESTART (Regrid?? why is this called regrid?)
+# Regrid (What is this?)
 #########################################################
-regrid=1			# True 1; False 0
+regrid=0			# True 1; False 0
 if [[ $regrid -eq 1 ]]
 then
     regrid_file=PLACEHOLDER	# PG: file to regrid from goes here
@@ -420,12 +449,12 @@ tauc_slippery_grounding_lines=1		# 1 True, 0 False
 ################################################################################
 
 
-ts_file_name=${expid}_${icemod}_timeseries_${start_year}-${end_year}.nc
-ex_file_name=${expid}_${icemod}_extra_${start_year}-${end_year}.nc
-ex_interval=100
+ts_file_name=${expid}_${icemod}_timeseries_${current_year}-${current_end}.nc
+ex_file_name=${expid}_${icemod}_extra_${current_year}-${current_end}.nc
+ex_interval=10
 ex_vars=diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,velsurfmag,mask,thk,topg,usurf
 
-output_file_name=${expid}_${icemod}_main_${start_year}-${end_year}.nc
+output_file_name=${expid}_${icemod}_main_${current_year}-${current_end}.nc
 
 # Prepare Work Directory
 function prep_workdir {
@@ -508,27 +537,41 @@ then
     echo   $execution_command -n $numproc $icemod -i $input_file_name \
 	   $bootstrap_opt \
 	   $resolution_opt \
-	   -ys $start_year -ye $end_year \
+	   -ys $current_year -ye $current_end \
 	   ${regrid_opt} \
 	   ${coupler_opt} \
 	   ${ICE_DYN_OPTS} \
-	   -ts_file $ts_file_name -ts_times ${start_year}:yearly:${end_year} \
-	   -extra_file $ex_file_name -extra_times ${start_year}:${ex_interval}:${end_year} -extra_vars $ex_vars \
+	   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
+	   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
 	   -o $output_file_name
 else
-    cd ${workdir}
-    prep_indir
-    prep_workdir
-    $execution_command -n $numproc $icemod -i $input_file_name \
-		       $bootstrap_opt \
-		       $resolution_opt \
-		       -ys $start_year -ye $end_year \
-		       ${regrid_opt} \
-		       ${coupler_opt} \
-		       ${ICE_DYN_OPTS} \
-		       -ts_file $ts_file_name -ts_times ${start_year}:yearly:${end_year} \
-		       -extra_file $ex_file_name -extra_times ${start_year}:${ex_interval}:${end_year} -extra_vars $ex_vars \
-		       -o $output_file_name
+    if [[ run_number -eq 0 ]]
+    then
+	prep_indir
+	prep_workdir
+	cd ${workdir}
+	$execution_command -n $numproc $icemod -i $input_file_name \
+			   $bootstrap_opt \
+			   $resolution_opt \
+			   -ys $current_year -ye $current_end \
+			   ${regrid_opt} \
+			   ${coupler_opt} \
+			   ${ICE_DYN_OPTS} \
+			   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
+			   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
+			   -o $output_file_name
+    else
+	ssh ollie0 bash -c "' cd ${workdir}; $execution_command -n $numproc $icemod -i $input_file_name \
+		           $bootstrap_opt \
+			   $resolution_opt \
+			   -ys $current_year -ye $current_end \
+			   ${regrid_opt} \
+			   ${coupler_opt} \
+			   ${ICE_DYN_OPTS} \
+			   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
+			   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
+			   -o $output_file_name'"
+    fi
 
     # Clean Up
     mv $ts_file_name $ex_file_name $output_file_name $outdir
@@ -536,9 +579,14 @@ else
     cd -
 fi
 
+
+# Increase the run counter in the date file:
+run_number=$(expr ${run_number} + 1)
+echo ${run_number} > ${expid}.date
+
 ##################
 #         END    
-##################    
+##################
 echo "This PISM run finished on $(date)"
 
 
