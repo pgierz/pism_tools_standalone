@@ -142,6 +142,9 @@ def parse_arguments():
     ##########################################################################
     downscale_parser_group = subparsers.add_parser("downscale",
                                                    help="Options that need to be provided for downscaling of GCM outputs to fine grids")
+    downscale_parser_group.add_argument("-dgcm", "--downscale_gcm",
+                                        type=_parse_file_and_var,
+                                        help="Downscale (file,variable) with low resolution (target) field")
     downscale_parser_group.add_argument("-dhires", "--downscale_hires",
                                         type=_parse_file_and_var,
                                         help="Downscale (file,variable) with high resolution (target) orography")
@@ -385,7 +388,7 @@ def yearly_cycle_atmo(args):
 def downscale(args):
     if downscale_available:
         field_hi = downscale_field(
-            netcdf.netcdf_file(args.ofile).variables[args.ifile_gcm[1]].data.squeeze(),
+            netcdf.netcdf_file(args.downscale_gcm[0]).variables[args.downscale_gcm[1]].data.squeeze(),
             netcdf.netcdf_file(args.downscale_hires[0]).variables[args.downscale_hires[1]].data.squeeze(),
             netcdf.netcdf_file(args.downscale_lores[0]).variables[args.downscale_lores[1]].data.squeeze(),
             netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze()

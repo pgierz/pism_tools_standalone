@@ -95,7 +95,19 @@ def parse_arguments():
     return parser.parse_args()
 
 
+    
+
 def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
+    """
+    Keyword Arguments:
+    field_lo   -- the field you want to downscale at the low resolution, resampled to high resolution
+    elev_hi    -- the elevation at the high resolution
+    elev_lo    -- the elevation at the low resolution
+    mask       -- the mask where the ice sheet area is found in the domain. <=0 will be excluded, >0 will be utilized.
+    half_a_box -- (default 20)
+
+    Paul J. Gierz, Wed Oct 19 10:11:01 2016
+    """
     now = time.time()
     field_hi = np.empty(field_lo.shape) * np.nan
     half_a_box_y = round(0.8 * half_a_box)
