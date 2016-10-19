@@ -429,8 +429,8 @@ def main():
         if args.atmo_command == "one_station":
             logging.critical("%s  %s  :" + not_impl_str) % (args.command, args.atmo_command)
             sys.exit(42)
-        if args.command == "downscale":
-            downscale(args)
+    if args.command == "downscale":
+        downscale(args)
 
 if __name__ == '__main__':
     with warnings.catch_warnings():
