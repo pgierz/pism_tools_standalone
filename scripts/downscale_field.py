@@ -95,9 +95,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-    
-
-def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
+def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=50):
     """
     Keyword Arguments:
     field_lo   -- the field you want to downscale at the low resolution, resampled to high resolution
@@ -109,6 +107,26 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
     Paul J. Gierz, Wed Oct 19 10:11:01 2016
     """
     now = time.time()
+    # Check dimensions:
+    dims_field_lo = field_lo.squeeze().shape
+    if len(dims_field_lo) > 3:
+        logging.critical("You have more than 3 dimensions. I have no idea what to do")
+        sys.exit("catastrophe! goodbye...")
+    dims_elev_hi = elev_hi.squeeze().shape
+    dims_elev_lo = elev_lo.squeeze().shape
+    need_time = True
+    if len(dims_elev_hi) != len(dims_elev_lo):
+        logging.critical("The orography fields have different dimensions, you need to fix this!")
+        logging.critical("High resolution is: " + str(dims_elev_hi))
+        logging.critical("Lo resolution is: " + str(dims_elev_lo))
+        sys.exit("catastrophe! goodbye...")
+    if len(dims_field_lo) == len(dims_elev_hi):
+        need_time = False
+    elif (len(dims_field_lo) != len(dims_elev_hi)) and (dims_field_lo[1] == dims_elev_hi[0]):
+        logging.warning("You probably have a time variable! I will try to loop over it")
+    else:
+        logging.critical("The field you are downscaling doesn't have the time dimension as the 1st dimension, this needs to be fixed!")
+        sys.exit("catastrophe! goodbye...")    
     field_hi = np.empty(field_lo.shape) * np.nan
     half_a_box_y = round(0.8 * half_a_box)
     half_a_box_x = round(half_a_box)
@@ -120,64 +138,126 @@ def downscale_field(field_lo, elev_hi, elev_lo, mask, half_a_box=20):
     logging.debug("i_range is "+str(i_range))
     logging.debug("j_range is "+str(j_range))
     counter = 0
-    for j in j_range:
-        for i in i_range:
-            logging.info("Working on index (%s, %s)" % (i, j))
-            logging.debug("Mask value is: %s" % (mask[i, j]))
-            if mask[i, j] > 0:
-                logging.debug("PASSED MASK SELECTION")
-                logging.debug("i slice is: %s to %s" % (i-half_a_box_y, i+half_a_box_y))
-                logging.debug("j slice is: %s to %s" % (j-half_a_box_x, j+half_a_box_x))
-                min_elev_lo = np.nanmin(
-                    elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
-                max_elev_lo = np.nanmax(
-                    elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+    if not need_time:
+        for j in j_range:
+            for i in i_range:
+                logging.info("Working on index (%s, %s)" % (i, j))
+                logging.debug("Mask value is: %s" % (mask[i, j]))
+                if mask[i, j] > 0:
+                    logging.debug("PASSED MASK SELECTION")
+                    logging.debug("i slice is: %s to %s" % (i-half_a_box_y, i+half_a_box_y))
+                    logging.debug("j slice is: %s to %s" % (j-half_a_box_x, j+half_a_box_x))
+                    min_elev_lo = np.nanmin(
+                        elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                    max_elev_lo = np.nanmax(
+                        elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
 
-                min_elev_hi = np.nanmin(
-                    elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
-                max_elev_hi = np.nanmax(
-                    elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                    min_elev_hi = np.nanmin(
+                        elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                    max_elev_hi = np.nanmax(
+                        elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
 
-                min_field_lo = np.nanmin(
-                    field_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
-                max_field_lo = np.nanmax(
-                    field_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                    min_field_lo = np.nanmin(
+                        field_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                    max_field_lo = np.nanmax(
+                        field_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
 
-                if j == (half_a_box_x):
-                    bottom_k = -half_a_box_x
-                    top_k = 0
-                elif j == (LX - half_a_box_x - 1):
-                    bottom_k = 0
-                    top_k = half_a_box_x
+                    if j == (half_a_box_x):
+                        bottom_k = -half_a_box_x
+                        top_k = 0
+                    elif j == (LX - half_a_box_x - 1):
+                        bottom_k = 0
+                        top_k = half_a_box_x
+                    else:
+                        bottom_k = 0
+                        top_k = 0
+
+                    if i == (half_a_box_y):
+                        left_l = -half_a_box_y
+                        right_l = 0
+                    elif i == (LY - half_a_box_y - 1):
+                        left_l = 0
+                        right_l = half_a_box_y
+                    else:
+                        left_l = 0
+                        right_l = 0
                 else:
-                    bottom_k = 0
+                    # Something about the mask didn't work
+                    logging.debug("Mask not used at (%s, %s)" % (i, j))
+                    left_l = 0
+                    right_l = 0
                     top_k = 0
+                    bottom_k = 0 
 
-                if i == (half_a_box_y):
-                    left_l = -half_a_box_y
-                    right_l = 0
-                elif i == (LY - half_a_box_y - 1):
-                    left_l = 0
-                    right_l = half_a_box_y
-                else:
-                    left_l = 0
-                    right_l = 0
-            else:
-                # Something about the mask didn't work
-                logging.debug("Mask not used at (%s, %s)" % (i, j))
-                left_l = 0
-                right_l = 0
-                top_k = 0
-                bottom_k = 0
+                for k in np.arange(bottom_k, top_k+1):
+                    for l in np.arange(left_l, right_l+1):
+                        if mask[i+l, j+k] > 0:
+                            if (max_elev_lo == min_elev_lo):
+                                field_hi[i+l, j+k] = field_lo[i+l, j+k]
+                            else:
+                                lapse_lo = (min_field_lo - max_field_lo)/(max_elev_lo - min_elev_lo)
+                                field_hi[i+l, j+k] = lapse_lo * (elev_hi[i+l, j+k] - elev_lo[i+l, j+k]) + field_lo[i+l, j+k]
+    else:
+        for t in range(dims_field_lo[0]):
+            logging.debug("WORKING ON TIMESTEP %s" % t)
+            for j in j_range:
+                for i in i_range:
+                    logging.info("Working on index (%s, %s)" % (i, j))
+                    logging.debug("Mask value is: %s" % (mask[i, j]))
+                    if mask[i, j] > 0:
+                        logging.debug("PASSED MASK SELECTION")
+                        logging.debug("i slice is: %s to %s" % (i-half_a_box_y, i+half_a_box_y))
+                        logging.debug("j slice is: %s to %s" % (j-half_a_box_x, j+half_a_box_x))
+                        min_elev_lo = np.nanmin(
+                            elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                        max_elev_lo = np.nanmax(
+                            elev_lo[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
 
-            for k in np.arange(bottom_k, top_k+1):
-                for l in np.arange(left_l, right_l+1):
-                    if mask[i+l, j+k] > 0:
-                        if (max_elev_lo == min_elev_lo):
-                            field_hi[i+l, j+k] = field_lo[i+l, j+k]
+                        min_elev_hi = np.nanmin(
+                            elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                        max_elev_hi = np.nanmax(
+                            elev_hi[i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+
+                        min_field_lo = np.nanmin(
+                            field_lo[t, i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+                        max_field_lo = np.nanmax(
+                            field_lo[t, i-half_a_box_y:i+half_a_box_y, j-half_a_box_x:j+half_a_box_x])
+
+                        if j == (half_a_box_x):
+                            bottom_k = -half_a_box_x
+                            top_k = 0
+                        elif j == (LX - half_a_box_x - 1):
+                            bottom_k = 0
+                            top_k = half_a_box_x
                         else:
-                            lapse_lo = (min_field_lo - max_field_lo)/(max_elev_lo - min_elev_lo)
-                            field_hi[i+l, j+k] = lapse_lo * (elev_hi[i+l, j+k] - elev_lo[i+l, j+k]) + field_lo[i+l, j+k]
+                            bottom_k = 0
+                            top_k = 0
+
+                        if i == (half_a_box_y):
+                            left_l = -half_a_box_y
+                            right_l = 0
+                        elif i == (LY - half_a_box_y - 1):
+                            left_l = 0
+                            right_l = half_a_box_y
+                        else:
+                            left_l = 0
+                            right_l = 0
+                    else:
+                        # Something about the mask didn't work
+                        logging.debug("Mask not used at (%s, %s)" % (i, j))
+                        left_l = 0
+                        right_l = 0
+                        top_k = 0
+                        bottom_k = 0 
+
+                    for k in np.arange(bottom_k, top_k+1):
+                        for l in np.arange(left_l, right_l+1):
+                            if mask[i+l, j+k] > 0:
+                                if (max_elev_lo == min_elev_lo):
+                                    field_hi[t, i+l, j+k] = field_lo[t, i+l, j+k]
+                                else:
+                                    lapse_lo = (min_field_lo - max_field_lo)/(max_elev_lo - min_elev_lo)
+                                    field_hi[t, i+l, j+k] = lapse_lo * (elev_hi[i+l, j+k] - elev_lo[i+l, j+k]) + field_lo[t, i+l, j+k]
     if (counter > 0):
         logging.warning("Neither condition was used %s times" % counter)
     logging.info("Finished! Time was %s" % str(time.time()-now))
