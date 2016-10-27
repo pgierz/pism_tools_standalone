@@ -57,7 +57,7 @@ icemod=pismr
 # DIRECTORY STRUCTURES
 ########################################
 
-expid=@EXPID@
+expid=@EXPNAME@
 # Directories
 
 homedir=/work/ollie/pgierz/pism_standalone/

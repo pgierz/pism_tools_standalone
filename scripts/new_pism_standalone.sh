@@ -13,4 +13,4 @@ do
     mkdir -pv $expid/$d
 done
 
-cat ${HOME}/palmod_pism_standalone/scripts/run_script_template.sh |sed s+@EXPID@+"${expid}"+g > $expid/${SCRIPTDIR}/${expid}.run
+cat ${HOME}/palmod_pism_standalone/scripts/run_script_template.sh |sed s+@EXPNAME@+"${expid}"+g > $expid/${SCRIPTDIR}/${expid}.run
