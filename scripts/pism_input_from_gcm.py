@@ -154,6 +154,10 @@ def parse_arguments():
     downscale_parser_group.add_argument("-dmask", "--downscale_mask",
                                         type=_parse_file_and_var,
                                         help="Downscale mask (file,variable)")
+    downscale_parser_group.add_argument("-dhab", "--downscale_half_a_box",
+                                        type=int,
+                                        help="Downscale half_a_box")
+
     ##########################################################################
     ##########################################################################
     # TODO: Find out which of these is not needed
@@ -391,11 +395,16 @@ def downscale(args):
             netcdf.netcdf_file(args.downscale_gcm[0]).variables[args.downscale_gcm[1]].data.squeeze(),
             netcdf.netcdf_file(args.downscale_hires[0]).variables[args.downscale_hires[1]].data.squeeze(),
             netcdf.netcdf_file(args.downscale_lores[0]).variables[args.downscale_lores[1]].data.squeeze(),
-            netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze()
-        )
+            netcdf.netcdf_file(args.downscale_mask[0]).variables[args.downscale_mask[1]].data.squeeze(),
+            half_a_box=args.downscale_half_a_box)
+        shutil.copy(args.downscale_gcm[0], args.ofile)
         fout = netcdf.netcdf_file(args.ofile, "a")
-        downscaled_temp = fout.createVariable("air_temp_downscaled", float,
-                                              ("y", "x"))
+        if netcdf.netcdf_file(args.downscale_gcm[0]).variables[args.downscale_gcm[1]].data.squeeze().shape == 2:
+            downscaled_temp = fout.createVariable("air_temp_downscaled", float,
+                                                  ("y", "x"))
+        else:
+            downscaled_temp = fout.createVariable("air_temp_downscaled", float,
+                                                  ("time", "y", "x"))
 
         downscaled_temp[:] = field_hi
     else:
