@@ -160,7 +160,6 @@ def parse_arguments():
 
     ##########################################################################
     ##########################################################################
-    # TODO: Find out which of these is not needed
     ##########################################################################
     atmosphere_top = subparsers.add_parser("prep_file_atmo",
                                            help="Prepares GCM netcdf files to work in PISM")
@@ -190,6 +189,31 @@ def parse_arguments():
     ##############################
     atmosphere_one_station_group = atmosphere_group.add_parser("one_station",
                                                                help="Make files for pism \"one_station\" atmosphere coupling")
+    ##########################################################################
+    ##########################################################################
+    ########################################################################## 
+    surface_top = subparsers.add_parser("prep_file_surface",
+                                           help="Prepares GCM netcdf files to work in PISM")
+    surface_top.add_argument("pism_ifile", help="The pism input file this surface forcing will be used with")
+    surface_group = surface_top.add_subparsers(dest="surface_command")
+    ##############################
+    # As example:
+    #
+    # atmosphere_yearly_cycle_group = atmosphere_group.add_parser("yearly_cycle",
+    #                                                             help="Make files for pism \"yearly_cycle\" atmosphere coupling")
+    # atmosphere_yearly_cycle_group.add_argument("-itemp", "--ifile_temperature",
+    #                                            required=True,
+    #                                            help="The file containing a yearly cycle of temperature, already on PISM grid")
+    # atmosphere_yearly_cycle_group.add_argument("-iprecip", "--ifile_precipitation",
+    #                                            required=True,
+    #                                            help="The file containing a yearly cycle of precipitation on PISM grid")
+
+    # surface type 1
+
+    # surface type 2
+
+    # etc
+    
     ##########################################################################
     ##########################################################################
     ##########################################################################

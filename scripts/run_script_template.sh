@@ -1,13 +1,23 @@
-#!/bin/bash
+#!/usr/bin/bash -l
 ################################################################################
 # BATCH HEADERS
 ################################################################################
-#SBATCH --job-name=PISM_Test
+#SBATCH --job-name=PI_C31_R
+#SBATCH --get-user-env
 #SBATCH -p mpp
-#SBATCH --ntasks=144
-#SBATCH --time=12:00:00
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=36
+#SBATCH --exclusive
+#SBATCH --time=00:60:00
+#SBATCH --output=greenland_pi_cosmosT31_remap_%j.log
+#SBATCH --error=greenland_pi_cosmosT31_remap_%j.log
+#SBATCH --mail-type=FAIL
 ################################################################################
+ulimit -s unlimited
 echo "This PISM run was perfomed on $HOSTNAME on $(date)"
+echo "Running in $(pwd)"
+echo "sourcing..."
+source /etc/bashrc && echo "done!"
 ################################################################################
 #           Parallel Ice Sheet Model    R U N   S C R I P T      (Ollie version)
 ################################################################################
@@ -60,18 +70,19 @@ icemod=pismr
 expid=@EXPNAME@
 # Directories
 
-homedir=/work/ollie/pgierz/pism_standalone/
-
-outdir=${homedir}/${expid}/output
-indir=${homedir}/${expid}/input
-bindir=/work/ollie/pgierz/pism0.7/bin/
-workdir=${homedir}/${expid}/work
+export homedir=/work/ollie/pgierz/pism_standalone/
+export scriptdir=${homedir}/${expid}/scripts
+export outdir=${homedir}/${expid}/output
+export indir=${homedir}/${expid}/input
+export logdir=${homedir}/${expid}/log
+export bindir=/work/ollie/pgierz/pism0.7/bin/
+export workdir=${homedir}/${expid}/work
 
 pooldir=/work/ollie/pgierz/pool_pism/
 subpool=examples_greenland
 
-numproc=8			# Number of processors to use
-execution_command="srun --mpi=pmi2"
+numproc=72			# Number of processors to use
+execution_command="/global/opt/slurm/default/bin/srun --mpi=pmi2"
 
 
 # Time Control
@@ -79,9 +90,15 @@ start_year=-10000
 end_year=0
 step_year=100
 
+# Go to scriptdir to start
+cd $scriptdir
+
+# NEEDED_FILES_LIST
+NEEDED_FILES=""
 
 if [ ! -f ${expid}.date ]
 then
+    echo "no date file found!"
     run_number=0
 else
     run_number=$(cat ${expid}.date)
@@ -94,11 +111,13 @@ then
     # Input File Name:
     input_file_name=pism_Greenland_5km_v1.1.nc
     current_year=$start_year
+    echo "FIRST YEAR"
 else
     bootstrap=0
     # Input File name needs to be the output of the last run
-    input_file_name=$(head -1 | ls ${outdir}/${expid}_${icemod}_main_*.nc)
+    input_file_name=$(ls ${outdir}/${expid}_${icemod}_main_*.nc | tail -1)
     current_year=$( expr ${start_year} + ${step_year} \* ${run_number} )
+    echo "RESTARTING for $current_year"
 fi
 
 current_end=$( expr ${current_year} + ${step_year} )
@@ -114,15 +133,24 @@ then
     bootstrap_opt="-bootstrap"
 fi
 
+NEEDED_FILES="$NEEDED_FILES $input_file_name"
 
 #############################################
 #                     RESOLUTION OPTIONS    
 #############################################
 
 
-res=low				# Pick between: low (20km), med (10km), high (5km)
+res=low				# Pick between: very_low (40km), low (20km), med (10km), high (5km)
 
-if [[ $res == "low" ]]
+if [[ $res == "very_low" ]]
+then
+    # PG: untested...
+    xres_ice=38
+    yres_ice=72
+    zres_ice=101
+    bz=11
+    skip_max=5
+elif [[ $res == "low" ]]
 then
     xres_ice=76
     yres_ice=141
@@ -246,9 +274,10 @@ case $atmosphere in
     *)
 	echo "ERROR: Atmosphere --> Ice coupler for $atmosphere unknown and not in standard types described in PISM manual. Go talk to Paul, he will figure it out..."
 esac
+NEEDED_FILES="$NEEDED_FILES $extra_file"
 
 # atmosphere_modifiers
-scalar_temperature_offsets=1	# True 1; False 0
+scalar_temperature_offsets=0	# True 1; False 0
 if [[ $scalar_temperature_offsets == 1 ]]
 then
     atmo_flag="${atmo_flag},delta_T"
@@ -267,7 +296,7 @@ then
     atmo_modifier_opts="$atmo_modifier_opts $scalar_temperature_offsets_opts"
 fi
 
-paleo_precipitation=1 		# True 1; False 0
+paleo_precipitation=0 		# True 1; False 0
 if [[ $paleo_precipitation == 1 ]]
 then
     atmo_flag="${atmo_flag},paleo_precip"
@@ -291,7 +320,7 @@ atmo_command="${atmo_flag} ${atmo_flag_extra} ${atmo_modifier_opts}"
 # Surface Process Models
 #########################
 
-surface_opt="pdd"
+surface_opt="simple"
 case $surface_opt in
     "simple")
 	surface_command=" -surface simple"
@@ -324,7 +353,7 @@ esac
 ###########################
 ocean="constant"
 use_input=1			# True 1; False 0
-# Uses the input file for the forcing processes in atmosphere
+# Uses the input file for the forcing processes in ocean
 
 case $ocean in
     "constant")
@@ -357,7 +386,7 @@ case $ocean in
 esac
 
 # Ocean modifiers
-scalar_sea_level_offset=1
+scalar_sea_level_offset=0
 if [[ $scalar_sea_level_offset == 1 ]]
 then
     ocean_flag="${ocean_flag},delta_SL"
@@ -521,11 +550,9 @@ fi
 ###################################
 #     Launch the Model            
 ###################################
-check=1
+check=0
 
 # Header for log:
-
-
 
 echo "All options set for run with: "
 echo "expid: $expid"
@@ -545,50 +572,43 @@ then
 	   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
 	   -o $output_file_name
 else
-    if [[ run_number -eq 0 ]]
-    then
-	prep_indir
-	prep_workdir
-	cd ${workdir}
-	$execution_command -n $numproc $icemod -i $input_file_name \
-			   $bootstrap_opt \
-			   $resolution_opt \
-			   -ys $current_year -ye $current_end \
-			   ${regrid_opt} \
-			   ${coupler_opt} \
-			   ${ICE_DYN_OPTS} \
-			   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
-			   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
-			   -o $output_file_name
-    else
-	ssh ollie0 bash -c "' cd ${workdir}; $execution_command -n $numproc $icemod -i $input_file_name \
-		           $bootstrap_opt \
-			   $resolution_opt \
-			   -ys $current_year -ye $current_end \
-			   ${regrid_opt} \
-			   ${coupler_opt} \
-			   ${ICE_DYN_OPTS} \
-			   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
-			   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
-			   -o $output_file_name'"
-    fi
-
-    # Clean Up
-    mv $ts_file_name $ex_file_name $output_file_name $outdir
-    # Go back
-    cd -
+    prep_indir
+    prep_workdir
+    cd ${workdir}
+    $execution_command -n $numproc $icemod -i $input_file_name \
+		       $bootstrap_opt \
+		       $resolution_opt \
+		       -ys $current_year -ye $current_end \
+		       ${regrid_opt} \
+		       ${coupler_opt} \
+		       ${ICE_DYN_OPTS} \
+		       -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
+		       -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
+		       -o $output_file_name
 fi
-
+# Clean Up
+mv $ts_file_name $ex_file_name $output_file_name $outdir
+# Go back
+cd ${scriptdir}
 
 # Increase the run counter in the date file:
 run_number=$(expr ${run_number} + 1)
 echo ${run_number} > ${expid}.date
 
+echo "Date file now is:"
+cat ${expid}.date
+
+echo "SSH EXECUTION OF NEXT RUN: ${run_number}"
+module_command="module load pism_externals netcdf-tools slurm"
+
+# For the love of CHRIST don't change the next line. It took me way
+# too long to figure out how to get it to work...
+
+# Submit the next job:
+ssh ollie0 bash -cl "' cd ${scriptdir}; pwd;  $module_command ; sbatch ${expid}.run '"
+
+
 ##################
 #         END    
 ##################
 echo "This PISM run finished on $(date)"
-
-
-
-
