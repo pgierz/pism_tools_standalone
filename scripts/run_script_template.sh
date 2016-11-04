@@ -45,6 +45,10 @@ source /etc/bashrc && echo "done!"
 # Paul J. Gierz, Wed Jul 27 10:59:38 2016                                      #
 # Paul J. Gierz, Fri Oct  7 10:52:57 2016                                      #
 # Paul J. Gierz, Wed Oct 12 15:44:25 2016                                      #
+# Paul J. Gierz, Fri Nov  4 10:49:18 2016                                      #
+# -----------------------------------------------------------------------------#
+# The version saved on Nov 4 is shared with the paleodyn group.                #
+# Paul J. Gierz, Fri Nov  4 10:49:18 2016                                      #
 # -----------------------------------------------------------------------------#
 # AWI Bremerhaven                                                              #
 ################################################################################
@@ -53,11 +57,11 @@ source /etc/bashrc && echo "done!"
 # TODOs                                                                        
 #
 # * DONE SBATCH headers?
-# * TODO Script headings and sections
+# * DONE Script headings and sections
 # * TODO organize script in such a way that it makes sense
 # * TODO separate parsing of options from setting of options. The user
 #        doesn't need to see everything
-# * TODO functions! functions everywhere!
+# * TODO How to handle resolution with different ice domains?
 #
 ################################################################################
 
@@ -72,7 +76,7 @@ expid=@EXPNAME@
 
 export homedir=/work/ollie/pgierz/pism_standalone/
 export scriptdir=${homedir}/${expid}/scripts
-export outdir=${homedir}/${expid}/output
+export outdir=${homedir}/${expid}/outdata
 export indir=${homedir}/${expid}/input
 export logdir=${homedir}/${expid}/log
 export bindir=/work/ollie/pgierz/pism0.7/bin/
@@ -307,7 +311,7 @@ fi
 
 # The following atmospheric modifiers are not (yet) implemented in the
 # run script logic, but can be set with command switches at the end if
-# the command string is modified at the end of the runscript.
+# the command string is modified at the end of the runscript:
 
 # scalar_precipitation_scaling
 # lapse_rate
@@ -330,7 +334,7 @@ case $surface_opt in
 	surface_command=" -surface given -surface_given_file $surface_given_file"
 	;;
     "elevation")
-	echo "surface type for $surface_opt not implemented, please go whack Paul over the head to fix this..."
+	echo "surface type for $surface_opt not implemented..."
 	;;
     "pdd")
 	# this one is complicated...
@@ -341,10 +345,10 @@ case $surface_opt in
 	;;
     "pik")
 
-	echo "surface type for $surface_opt not implemented, please go whack Paul over the head to fix this..."
+	echo "surface type for $surface_opt not implemented..."
 	;;
     *)
-	echo "unknown surface opt provided. Go talk to Paul, he will figure it out..."
+	echo "unknown surface opt provided."
 esac
 
 
@@ -477,11 +481,16 @@ tauc_slippery_grounding_lines=1		# 1 True, 0 False
 # END OF USER INTERFACE
 ################################################################################
 
+# The ex_file will contain only variables useful for coupling to
+# GCM. The option o_size big (provided during the execution command)
+# ensures that all the other variables are present in the main output
+# files.
 
 ts_file_name=${expid}_${icemod}_timeseries_${current_year}-${current_end}.nc
-ex_file_name=${expid}_${icemod}_extra_${current_year}-${current_end}.nc
+ex_file_name=${expid}_${icemod}_coupling_${current_year}-${current_end}.nc
 ex_interval=10
-ex_vars=diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,velsurfmag,mask,thk,topg,usurf
+# ex_vars=diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,velsurfmag,mask,thk,topg,usurf
+ex_vars=mask,thk,climatic_mass_balance_cumulative,discharge_flux_cumulative
 
 output_file_name=${expid}_${icemod}_main_${current_year}-${current_end}.nc
 
@@ -512,8 +521,10 @@ function prep_indir {
 
 
 
+# TODO: This still needs to be organized a bit. I am not sure if it
+# makes sense to be here or somewhere else...
 
-# Parse Options:
+#Parse Options:
 ## Ice Dynamics Opts
 ### Calving
 CALVING_OPTS="-calving $calving_opt -sia_e $sia_e"
@@ -550,6 +561,8 @@ fi
 ###################################
 #     Launch the Model            
 ###################################
+# Set check to 1 if you want to print out the pism execution command to check what would be done.
+
 check=0
 
 # Header for log:
@@ -570,7 +583,7 @@ then
 	   ${ICE_DYN_OPTS} \
 	   -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
 	   -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
-	   -o $output_file_name
+	   -o $output_file_name -o_size big
 else
     prep_indir
     prep_workdir
@@ -584,7 +597,7 @@ else
 		       ${ICE_DYN_OPTS} \
 		       -ts_file $ts_file_name -ts_times ${current_year}:yearly:${current_end} \
 		       -extra_file $ex_file_name -extra_times ${current_year}:${ex_interval}:${current_end} -extra_vars $ex_vars \
-		       -o $output_file_name
+		       -o $output_file_name -o_size big
 fi
 # Clean Up
 mv $ts_file_name $ex_file_name $output_file_name $outdir
@@ -601,9 +614,7 @@ cat ${expid}.date
 echo "SSH EXECUTION OF NEXT RUN: ${run_number}"
 module_command="module load pism_externals netcdf-tools slurm"
 
-# For the love of CHRIST don't change the next line. It took me way
-# too long to figure out how to get it to work...
-
+# This next line was tricky to actually figure out.
 # Submit the next job:
 ssh ollie0 bash -cl "' cd ${scriptdir}; pwd;  $module_command ; sbatch ${expid}.run '"
 
