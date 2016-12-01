@@ -67,6 +67,8 @@ source /etc/bashrc && echo "done!"
 
 icemod=pismr
 
+coupling=0			# PG: Coupling to GCM, 1 True, 0 False
+
 ########################################
 # DIRECTORY STRUCTURES
 ########################################
@@ -100,12 +102,12 @@ cd $scriptdir
 # NEEDED_FILES_LIST
 NEEDED_FILES=""
 
-if [ ! -f ${expid}.date ]
+if [ ! -f ${expid}.pism.date ]
 then
     echo "no date file found!"
     run_number=0
 else
-    run_number=$(cat ${expid}.date)
+    run_number=$(cat ${expid}.pism.date)
 fi
 
 
@@ -344,7 +346,6 @@ case $surface_opt in
 	surface_command=" -surface pdd "
 	;;
     "pik")
-
 	echo "surface type for $surface_opt not implemented..."
 	;;
     *)
@@ -606,20 +607,25 @@ cd ${scriptdir}
 
 # Increase the run counter in the date file:
 run_number=$(expr ${run_number} + 1)
-echo ${run_number} > ${expid}.date
+echo ${run_number} > ${expid}.pism.date
 
 echo "Date file now is:"
-cat ${expid}.date
+cat ${expid}.pism.date
 
-echo "SSH EXECUTION OF NEXT RUN: ${run_number}"
-module_command="module load pism_externals netcdf-tools slurm"
+if [ ! ${coupling} ]
+then
+    echo "SSH EXECUTION OF NEXT RUN: ${run_number}"
+    module_command="module load pism_externals netcdf-tools slurm"
+    
+    # This next line was tricky to actually figure out.
+    # Submit the next job:
+    ssh ollie0 bash -cl "' cd ${scriptdir}; pwd;  $module_command ; sbatch ${expid}.run '"
+fi
 
-# This next line was tricky to actually figure out.
-# Submit the next job:
-ssh ollie0 bash -cl "' cd ${scriptdir}; pwd;  $module_command ; sbatch ${expid}.run '"
 
 
 ##################
 #         END    
 ##################
 echo "This PISM run finished on $(date)"
+: > ${workdir}/pism_done.dat

@@ -264,9 +264,9 @@ def given_atmo(args):
         tempvarname = input("What is the temperature varname you want to use? ")
     fin_precip = netcdf.netcdf_file(args.ifile_precipitation)
     if fin_precip.source == "ECHAM5.4":
-        precipvarname = "precip"
+        precipvarname = "aprs"
     elif fin_precip.source == "ECHAM6":
-        precipvarname = "precip"
+        precipvarname = "aprs"
     else:
         logging.warn("Model unknown, waiting for user response...")
         print fin_precip.variables
@@ -304,15 +304,16 @@ def given_atmo(args):
     ############################################################
     # Make X and Y
     ############################################################
-    logging.warn("Trying to do NCO by python-nco interface...")
+    # logging.warn("Trying to do NCO by python-nco interface...")
     NCO = nco.Nco()
     NCO.ncks(options="-c", input=args.pism_ifile, output="foo.nc")
-    NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
-    # inputfiles = " ".join([temp_ofile, fout.filename])
+    # PG: Dirty hack, somehow the NCO.ncrename doesn't work, so we do over os instead
+    # NCO.ncrename(options="-d x1,x -d y1,y -v x1,x -v y1,y", input="foo.nc", output="foo1.nc")
+    os.system("ncrename -o foo1.nc -d .x1,x -d .y1,y -v .x1,x -v .y1,y foo.nc")
     # PG: Dirty hack, somehow the NCO.ncks doesn't work, so we do over os instead
     os.system("ncks -q -A foo1.nc "+fout.filename)
     os.system("rm foo.nc foo1.nc")
-    logging.warn("The warning just produced by ncks at this point does not cause any problems")
+    # logging.warn("The warning just produced by ncks at this point does not cause any problems")
     ############################################################
     return None
 
